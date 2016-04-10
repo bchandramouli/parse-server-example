@@ -184,7 +184,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     // Notice we do this for all asynchronous calls since we
     // want to handle the error differently each time.
     return homeQuery.first().then(null, function(error) {
-      return Parse.Promise.error('Sorry, the home record is no longer available.');
+      return Parse.Promise.error('Sorry, the home record query failed.');
     });
 
   }).then(function(result) {
