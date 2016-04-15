@@ -117,8 +117,10 @@ Parse.Cloud.define('createBeforeSaveChangedObject', function(req, res){
 })
 
 
-// From here... 
-// New code added for inventory processing 
+/**
+ * From here... 
+ * New code added for inventory processing 
+ */
 
 // Initialize the Stripe and Mailgun Cloud Modules
 var Stripe = require('stripe')("sk_test_3n3xj9zbj6hOkEhngx7uITeH");
@@ -130,15 +132,15 @@ function stringifyHomeInventory(homeInv, price) {
        orderStringified = orderStringified +
         homeInv[i].get("name") +
         " * " +
-        string(homeInv[i].get("homeCount")) +
+        homeInv[i].get("homeCount").toString() +
         " @ " +
-        string(homeInv[i].get("rate")) + 
+        homeInv[i].get("rate").toString() + 
         " per " +
         homeInv[i].get("unit") +
         "\n\n";
   }
 
-  orderStringified = orderStringified + "\n" + "Total Price: $" + string(price) + "\n";
+  orderStringified = orderStringified + "\n" + "Total Price: $" + price.toString() + "\n";
 
   return orderStringified;
 }
@@ -149,46 +151,58 @@ function getHomeInventoryPrice(homeInv) {
   for (var i = 0 ; i < homeInv.length; i++) {
     price = price + homeInv[i].get("rate") * homeInv[i].get("homeCount");
   }
-
   return price;
 }
 
-// Purchase an item from the Parse Store using the Stripe
-// Cloud Module.
-// 
-//  Expected input (in request.params):
-//   homeId         : String, to retrieve the home details
-//   cardToken      : String, the credit card token returned to the client from Stripe
-//
-// Also, please note that on success, "Success" will be returned. 
+/**
+ * Purchase an item from the Parse Store using the Stripe
+ * Cloud Module.
+ * 
+ *  Expected input (in request.params):
+ *   homeId         : String, to retrieve the home details
+ *   cardToken      : String, the credit card token returned to the client from Stripe
+ *
+ * Also, please note that on success, "Success" will be returned. 
+ */
 Parse.Cloud.define('purchaseInventory', function(request, response) {
-  // Ensure only Cloud Code can get access by using the master key.
-  // Parse.Cloud.useMasterKey(); 
-  // XXX - this has been changed to useMasterKey: true as an option to each Parse.Query!
+  /**
+   * Ensure only Cloud Code can get access by using the master key.
+   * Parse.Cloud.useMasterKey(); 
+   * XXX - this has been changed to useMasterKey: true as an option to each Parse.Query!
+   */
 
   // Top level variables used in the promise chain. Unlike callbacks,
   // each link in the chain of promise has a separate context.
   var home, order, orderString;
   var price = 0;
 
+  var cardToken = request.params.cardToken;
+
   // We start in the context of a promise to keep all the
   // asynchronous code consistent. This is not required.
   Parse.Promise.as().then(function() {
+
+    var homeQuery = new Parse.Query('Homes');
     // Find the item to purchase.
-    var homeQuery = new Parse.Query('Home');
-    homeQuery.equalTo('objectId', request.params.homeId);
+    homeQuery.equalTo("objectId", request.params.homeId);
     homeQuery.include("homeInventory");
 
-    // Find the resuts. We handle the error here so our
-    // handlers don't conflict when the error propagates.
-    // Notice we do this for all asynchronous calls since we
-    // want to handle the error differently each time.
-    return homeQuery.first().then(null, function(error) {
-      return Parse.Promise.error('Sorry, the home record query failed.');
+    /**
+     * Find the resuts. We handle the error here so our
+     * handlers don't conflict when the error propagates.
+     * Notice we do this for all asynchronous calls since we
+     * want to handle the error differently each time.
+     */
+    
+    return homeQuery.first().then(null, function (error) {
+        return Parse.Promise.error('DB query failed? - The home record query failure.');
     });
 
+    //.then(null, function(error) {
+    // return Parse.Promise.error('DB query failed? - The home record query failure.');
+    // });
   }).then(function(result) {
-    // Make sure we found an item and that it's not out of stock.
+    // Make sure we found an item.
     if (!result) {
       return Parse.Promise.error('Sorry, the home record is no longer available.');
     }
@@ -196,7 +210,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     home = result;
     var inventory = home.get("homeInventory");
     price = getHomeInventoryPrice(inventory);
-    orderString = stringifyHomeInventory(inventry, price);
+    orderString = stringifyHomeInventory(inventory, price);
+
 
     // We have items left! Let's create our order item before 
     // charging the credit card (just to be safe).
@@ -212,16 +227,19 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     return order.save().then(null, function(error) {
       // This would be a good place to replenish the quantity we've removed.
       // We've ommited this step in this app.
-      console.log('Creating order object failed. Error: ' + error);
       return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
     });
 
   }).then(function(order) { 
     // Now we can charge the credit card using Stripe and the credit card token.
-    return Stripe.Charges.create({
+
+    console.log("order is ", order);
+    console.log("price is ", price);
+
+    return Stripe.charges.create({
       amount: price * 100, // express dollars in cents 
       currency: 'usd',
-      card: request.params.cardToken
+      card: cardToken
     }).then(null, function(error) {
       console.log('Charging with stripe failed. Error: ' + error);
       return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
@@ -230,15 +248,25 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   }).then(function(purchase) {
     // Credit card charged! Now we save the ID of the purchase on our
     // order and mark it as 'charged'.
+
+    console.log("purchase is ", purchase);
+
     order.set('stripePaymentId', purchase.id);
     order.set('charged', true);
 
+    console.log("in function purchase \n");
+
     // Save updated order
     return order.save().then(null, function(error) {
-      // This is the worst place to fail since the card was charged but the order's
-      // 'charged' field was not set. Here we need the user to contact us and give us
-      // details of their credit card (last 4 digits) and we can then find the payment
-      // on Stripe's dashboard to confirm which order to rectify. 
+      /**
+       * This is the worst place to fail since the card was charged but the order's
+       * 'charged' field was not set. Here we need the user to contact us and give us
+       * details of their credit card (last 4 digits) and we can then find the payment
+       * on Stripe's dashboard to confirm which order to rectify. 
+       */
+
+      console.log("order save screwup \n");
+      
       return Parse.Promise.error('A critical error has occurred with your order. Please ' + 
                                  'contact reachorchardview@gmail.com at your earliest convinience. ');
     });
@@ -261,6 +289,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
             "Thank you,\n" +
             "The FarmView Team";
 
+    console.log("sending email \n");
+
     // Send the email.
     return Mailgun.sendEmail({
       from: 'reachorchardview@gmail.com',
@@ -269,6 +299,9 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
       subject: 'Your farmer\'s market inventory was processed!',
       text: body
     }).then(null, function(error) {
+
+      console.log("email send failure \n");
+
       return Parse.Promise.error('Your purchase was successful, but we were not able to ' +
                                  'send you an email. Contact us at reachorchardview@gmail.com if ' +
                                  'you have any questions.');
@@ -276,12 +309,21 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
   }).then(function() {
     // And we're done!
+
+    console.log("Hurrasy - finally done!!! \n");
+
     response.success('Success');
 
-  // Any promise that throws an error will propagate to this handler.
-  // We use it to return the error from our Cloud Function using the 
-  // message we individually crafted based on the failure above.
+  /**
+   * Any promise that throws an error will propagate to this handler.
+   * We use it to return the error from our Cloud Function using the 
+   * message we individually crafted based on the failure above.
+   */
   }, function(error) {
+
+    console.log("the error is", error);
+
     response.error(error);
+
   });
 });
