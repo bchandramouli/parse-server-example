@@ -124,7 +124,8 @@ Parse.Cloud.define('createBeforeSaveChangedObject', function(req, res){
 
 // Initialize the Stripe and Mailgun Cloud Modules
 var Stripe = require('stripe')("sk_test_3n3xj9zbj6hOkEhngx7uITeH");
-var Mailgun = require('mailgun-js')({apiKey: "afab485a6a9bf921692f83c3c1d03b56", domain: "sandboxd6cc36b660184159bc67c3f403466981.mailgun.org"});
+var Mailgun = require('mailgun-js')({apiKey: "key-afab485a6a9bf921692f83c3c1d03b56",
+                                     domain: "sandboxd6cc36b660184159bc67c3f403466981.mailgun.org"});
 
 function stringifyHomeInventory(homeInv, price) {
   var orderStringified;
@@ -133,9 +134,9 @@ function stringifyHomeInventory(homeInv, price) {
         homeInv[i].get("name") +
         " * " +
         homeInv[i].get("homeCount").toString() +
-        " @ " +
+        " @ $" +
         homeInv[i].get("rate").toString() + 
-        " per " +
+        "/" +
         homeInv[i].get("unit") +
         "\n\n";
   }
@@ -292,15 +293,16 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     console.log("sending email \n");
 
     // Send the email.
-    return Mailgun.sendEmail({
+    return Mailgun.messages().send({
       from: 'reachorchardview@gmail.com',
-      to: home.get("email"),
+      //to: home.get("email"),
+      to: 'reachorchardview@gmail.com', // hack - the mailgun sandbox only allows approved emails
       cc: 'reachorchardview@gmail.com',
       subject: 'Your farmer\'s market inventory was processed!',
       text: body
     }).then(null, function(error) {
 
-      console.log("email send failure \n");
+      console.log("email send failure", error);
 
       return Parse.Promise.error('Your purchase was successful, but we were not able to ' +
                                  'send you an email. Contact us at reachorchardview@gmail.com if ' +
@@ -320,8 +322,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
    * message we individually crafted based on the failure above.
    */
   }, function(error) {
-
-    console.log("the error is", error);
 
     response.error(error);
 
