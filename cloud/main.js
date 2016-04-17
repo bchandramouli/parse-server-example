@@ -195,10 +195,12 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
      * want to handle the error differently each time.
      */
 
-    home = homeQuery.find();
-
-    console.log("home record is ", home);
-
+    home = homeQuery.find().then(function() {
+      console.log("home record is ", home);
+    }, function(error) {
+      console.log("could not find the home rec", error);
+    });
+    
     
     return homeQuery.first().then(null, function (error) {
         return Parse.Promise.error('DB query failed? - The home record query failure.');
