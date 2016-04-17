@@ -234,9 +234,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   }).then(function(order) { 
     // Now we can charge the credit card using Stripe and the credit card token.
 
-    console.log("order is ", order);
-    console.log("price is ", price);
-
     return Stripe.charges.create({
       amount: price * 100, // express dollars in cents 
       currency: 'usd',
@@ -254,8 +251,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
     order.set('stripePaymentId', purchase.id);
     order.set('charged', true);
-
-    console.log("in function purchase \n");
 
     // Save updated order
     return order.save().then(null, function(error) {
