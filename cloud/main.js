@@ -194,6 +194,11 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
      * Notice we do this for all asynchronous calls since we
      * want to handle the error differently each time.
      */
+
+    home = homeQuery.find();
+
+    console.log("home record is ", home);
+
     
     return homeQuery.first().then(null, function (error) {
         return Parse.Promise.error('DB query failed? - The home record query failure.');
