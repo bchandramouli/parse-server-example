@@ -1,3 +1,6 @@
+# This is just a test tool to validate before deploying to AWS!
+
+
 # parse-server-example
 
 Example project using the [parse-server](https://github.com/ParsePlatform/parse-server) module on Express.
