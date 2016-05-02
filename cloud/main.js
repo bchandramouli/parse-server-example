@@ -195,9 +195,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
      * want to handle the error differently each time.
      */
 
-    home = homeQuery.find().then(function() {
-      console.log("home record is ", home);
-    }, function(error) {
+    home = homeQuery.find().then(null, function(error) {
       console.log("could not find the home rec", error);
     });
     
@@ -254,8 +252,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     // Credit card charged! Now we save the ID of the purchase on our
     // order and mark it as 'charged'.
 
-    console.log("purchase is ", purchase);
-
     order.set('stripePaymentId', purchase.id);
     order.set('charged', true);
 
@@ -292,8 +288,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
             "Thank you,\n" +
             "The FarmView Team";
 
-    console.log("sending email \n");
-
     // Send the email.
     return Mailgun.messages().send({
       from: 'reachorchardview@gmail.com',
@@ -313,9 +307,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
   }).then(function() {
     // And we're done!
-
-    console.log("Hurrasy - finally done!!! \n");
-
     response.success('Success');
 
   /**
