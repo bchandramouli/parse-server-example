@@ -118,8 +118,8 @@ Parse.Cloud.define('createBeforeSaveChangedObject', function(req, res){
 
 
 /**
- * From here... 
- * New code added for inventory processing 
+ * From here...
+ * New code added for inventory processing
  */
 
 // Initialize the Stripe and Mailgun Cloud Modules
@@ -135,7 +135,7 @@ function stringifyHomeInventory(homeInv, price) {
         " * " +
         homeInv[i].get("homeCount").toString() +
         " @ $" +
-        homeInv[i].get("rate").toString() + 
+        homeInv[i].get("rate").toString() +
         "/" +
         homeInv[i].get("unit") +
         "\n\n";
@@ -158,17 +158,17 @@ function getHomeInventoryPrice(homeInv) {
 /**
  * Purchase an item from the Parse Store using the Stripe
  * Cloud Module.
- * 
+ *
  *  Expected input (in request.params):
  *   homeId         : String, to retrieve the home details
  *   cardToken      : String, the credit card token returned to the client from Stripe
  *
- * Also, please note that on success, "Success" will be returned. 
+ * Also, please note that on success, "Success" will be returned.
  */
 Parse.Cloud.define('purchaseInventory', function(request, response) {
   /**
    * Ensure only Cloud Code can get access by using the master key.
-   * Parse.Cloud.useMasterKey(); 
+   * Parse.Cloud.useMasterKey();
    * XXX - this has been changed to useMasterKey: true as an option to each Parse.Query!
    */
 
@@ -198,8 +198,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     home = homeQuery.find().then(null, function(error) {
       console.log("could not find the home rec", error);
     });
-    
-    
+
     return homeQuery.first().then(null, function (error) {
         return Parse.Promise.error('DB query failed? - The home record query failure.');
     });
@@ -219,7 +218,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     orderString = stringifyHomeInventory(inventory, price);
 
 
-    // We have items left! Let's create our order item before 
+    // We have items left! Let's create our order item before
     // charging the credit card (just to be safe).
     order = new Parse.Object('Order');
     order.set('name', home.get("owner"));
@@ -236,11 +235,11 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
       return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
     });
 
-  }).then(function(order) { 
+  }).then(function(order) {
     // Now we can charge the credit card using Stripe and the credit card token.
 
     return Stripe.charges.create({
-      amount: price * 100, // express dollars in cents 
+      amount: price * 100, // express dollars in cents
       currency: 'usd',
       card: cardToken
     }).then(null, function(error) {
@@ -261,12 +260,12 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
        * This is the worst place to fail since the card was charged but the order's
        * 'charged' field was not set. Here we need the user to contact us and give us
        * details of their credit card (last 4 digits) and we can then find the payment
-       * on Stripe's dashboard to confirm which order to rectify. 
+       * on Stripe's dashboard to confirm which order to rectify.
        */
 
       console.log("order save screwup \n");
-      
-      return Parse.Promise.error('A critical error has occurred with your order. Please ' + 
+
+      return Parse.Promise.error('A critical error has occurred with your order. Please ' +
                                  'contact reachorchardview@gmail.com at your earliest convinience. ');
     });
 
@@ -281,9 +280,9 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     body += "Shipping Address: \n" +
             home.get("owner") + "\n" +
             home.get("address") + "\n" +
-            "Mountain View, CA " + home.get("zip") + "\n" + 
+            "Mountain View, CA " + home.get("zip") + "\n" +
             "United States, " + "\n" +
-            "\nWe will deliver your item by 2 pm today. " + 
+            "\nWe will deliver your item by 2 pm today. " +
             "Let us know if you have any questions!\n\n" +
             "Thank you,\n" +
             "The FarmView Team";
@@ -311,7 +310,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
   /**
    * Any promise that throws an error will propagate to this handler.
-   * We use it to return the error from our Cloud Function using the 
+   * We use it to return the error from our Cloud Function using the
    * message we individually crafted based on the failure above.
    */
   }, function(error) {
