@@ -319,3 +319,48 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
   });
 });
+
+
+
+/**
+ * Send user code to the registered email.
+ *
+ *  Expected input (in request.params):
+ *   email     : User's email
+ *   code      : Code to be sent in the email
+ *
+ * Simple email send function - on success, "Success" will be returned.
+ */
+Parse.Cloud.define('verifyEmail', function(request, response) {
+  // Top level variables used in the promise chain. Unlike callbacks,
+  // each link in the chain of promise has a separate context.
+
+  var email = request.params.email;
+  var code = request.params.code;
+
+    // Let's send an email to the user.
+
+    // Generate the email body string.
+    var body = "Hi,\n\n" +
+               "The confirmation code for your FarmView App registration is: " +
+               code + "\n";
+
+    body += "Thank you,\n" +
+            "The FarmView Team";
+
+    // Send the email.
+    Mailgun.messages().send({
+      from: 'reachorchardview@gmail.com',
+      //to: home.get("email"),
+      to: email, // hack - the mailgun sandbox only allows approved emails
+      cc: 'reachorchardview@gmail.com',
+      subject: 'Your FarmView registration code!',
+      text: body
+    }).then(function() {
+      response.success('Success');
+    }, function(error) {
+
+      console.log("email send failure", error);
+      response.error(error);
+    });
+});
