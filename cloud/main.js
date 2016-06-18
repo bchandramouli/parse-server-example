@@ -290,7 +290,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     // Send the email.
     return Mailgun.messages().send({
       from: 'reachorchardview@gmail.com',
-      //to: home.get("email"),
+      // to: home.get("email"),
       to: 'reachorchardview@gmail.com', // hack - the mailgun sandbox only allows approved emails
       cc: 'reachorchardview@gmail.com',
       subject: 'Your farmer\'s market inventory was processed!',
@@ -335,15 +335,15 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
   // Top level variables used in the promise chain. Unlike callbacks,
   // each link in the chain of promise has a separate context.
 
-  var email = request.params.email;
-  var code = request.params.code;
+  var userEmail = request.params.userEmail;
+  var userCode = request.params.userCode;
 
     // Let's send an email to the user.
 
     // Generate the email body string.
     var body = "Hi,\n\n" +
                "The confirmation code for your FarmView App registration is: " +
-               code + "\n";
+               userCode + "\n\n";
 
     body += "Thank you,\n" +
             "The FarmView Team";
@@ -352,7 +352,7 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
     Mailgun.messages().send({
       from: 'reachorchardview@gmail.com',
       //to: home.get("email"),
-      to: email, // hack - the mailgun sandbox only allows approved emails
+      to: userEmail, // hack - the mailgun sandbox only allows approved emails
       cc: 'reachorchardview@gmail.com',
       subject: 'Your FarmView registration code!',
       text: body
