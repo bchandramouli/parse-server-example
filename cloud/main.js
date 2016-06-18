@@ -124,7 +124,7 @@ Parse.Cloud.define('createBeforeSaveChangedObject', function(req, res){
 
 // Initialize the Stripe and Mailgun Cloud Modules
 var Stripe = require('stripe')("sk_test_3n3xj9zbj6hOkEhngx7uITeH");
-var Mailgun = require('../mailgun-js')({apiKey: "key-afab485a6a9bf921692f83c3c1d03b56",
+var Mailgun = require('mailgun-js')({apiKey: "key-afab485a6a9bf921692f83c3c1d03b56",
                                      domain: "sandboxd6cc36b660184159bc67c3f403466981.mailgun.org"});
 
 function stringifyHomeInventory(homeInv, price) {
