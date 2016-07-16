@@ -388,17 +388,20 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
   var client = Influx(influxDbUrl);
 
   Parse.Promise.as().then(function() {
-    client.writePoint(seriesName, {value: sinVal}, function(err, resp) {
-      if (err) {
-        console.log("error writing to DB", err);
-        return Parse.Promise.error('error writing to DB');
-      }
-      console.log(resp.toString());
-    });
+    client.writePoint(seriesName, {value: sinVal}, 
+      function(err, resp) {
+        if (err) {
+          console.log("error writing to DB", err);
+          return Parse.Promise.error('error writing to DB');
+        }
+        console.log(resp.toString());
+      });
   }).then(function() {
     // And we're done!
+    console.log("success case");
     response.success('Success');
   }, function(error) {
+    console.log("error case", error.toString());
     response.error(error);
   });
 });
