@@ -369,7 +369,7 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
 
 var Influx = require('influx');
 var myDB = 'test1';
-var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/myDB';
+var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/${myDB}';
 var seriesName = 'sin'
 
 /**
@@ -384,11 +384,12 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
   // Top level variables used in the promise chain. Unlike callbacks,
   // each link in the chain of promise has a separate context.
   var sinVal = request.params.val;
-
   var client = Influx(influxDbUrl);
 
+  var point = {value: sinVal};
+
   Parse.Promise.as().then(function() {
-    client.writePoint(seriesName, {value: sinVal}, 
+    client.writePoint(seriesName, point, 
       function(err, resp) {
         if (err) {
           console.log("error writing to DB", err);
