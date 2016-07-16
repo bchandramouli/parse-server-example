@@ -338,29 +338,67 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
   var userEmail = request.params.userEmail;
   var userCode = request.params.userCode;
 
-    // Let's send an email to the user.
+  console.log("in verify email", request.toString());
 
-    // Generate the email body string.
-    var body = "Hi,\n\n" +
-               "The confirmation code for your FarmView App registration is: " +
-               userCode + "\n\n";
+  // Let's send an email to the user.
 
-    body += "Thank you,\n" +
-            "The FarmView Team";
+  // Generate the email body string.
+  var body = "Hi,\n\n" +
+             "The confirmation code for your FarmView App registration is: " +
+             userCode + "\n\n";
 
-    // Send the email.
-    Mailgun.messages().send({
-      from: 'reachorchardview@gmail.com',
-      //to: home.get("email"),
-      to: userEmail, // hack - the mailgun sandbox only allows approved emails
-      cc: 'reachorchardview@gmail.com',
-      subject: 'Your FarmView registration code!',
-      text: body
-    }).then(function() {
-      response.success('Success');
-    }, function(error) {
+  body += "Thank you,\n" +
+          "The FarmView Team";
 
-      console.log("email send failure", error);
-      response.error(error);
+  // Send the email.
+  Mailgun.messages().send({
+    from: 'reachorchardview@gmail.com',
+    //to: home.get("email"),
+    to: userEmail, // hack - the mailgun sandbox only allows approved emails
+    cc: 'reachorchardview@gmail.com',
+    subject: 'Your FarmView registration code!',
+    text: body
+  }).then(function() {
+    response.success('Success');
+  }, function(error) {
+
+    console.log("email send failure", error);
+    response.error(error);
+  });
+});
+
+var Influx = require('influx');
+var myDB = 'test1';
+var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/myDB';
+var seriesName = 'sin'
+
+/**
+ * Log a time series entry in the InfluxDB.
+ *
+ *  Expected input (in request.params):
+ *   value     : Value to be recorded
+ *
+ * Simple record value function - on success, "Success" will be returned.
+ */
+Parse.Cloud.define('recordTSVal', function(request, response) {
+  // Top level variables used in the promise chain. Unlike callbacks,
+  // each link in the chain of promise has a separate context.
+  var sinVal = request.params.val;
+
+  var client = influx(influxDbUrl);
+
+  Parse.Promise.as().then(function() {
+    client.writePoint(seriesName, {value: sinVal}, function(err, resp) {
+      if (err) {
+        console.log("error writing to DB", err);
+        return Parse.Promise.error('error writing to DB');
+      }
+      console.log(resp.toString());
     });
+  }).then(function() {
+    // And we're done!
+    response.success('Success');
+  }, function(error) {
+    response.error(error);
+  });
 });
