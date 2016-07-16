@@ -194,7 +194,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
      * Notice we do this for all asynchronous calls since we
      * want to handle the error differently each time.
      */
-
     home = homeQuery.find().then(null, function(error) {
       console.log("could not find the home rec", error);
     });
@@ -361,16 +360,14 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
   }).then(function() {
     response.success('Success');
   }, function(error) {
-
     console.log("email send failure", error);
     response.error(error);
   });
 });
 
+
 var Influx = require('influx');
-var myDB = 'test1';
-var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/myDB';
-var seriesName = 'sin'
+var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/${myDB}';
 
 /**
  * Log a time series entry in the InfluxDB.
@@ -383,22 +380,35 @@ var seriesName = 'sin'
 Parse.Cloud.define('recordTSVal', function(request, response) {
   // Top level variables used in the promise chain. Unlike callbacks,
   // each link in the chain of promise has a separate context.
+
   var sinVal = request.params.val;
 
-  var client = influx(influxDbUrl);
+  var myDB = 'test1';
+  var seriesName = 'sin'
 
-  Parse.Promise.as().then(function() {
-    client.writePoint(seriesName, {value: sinVal}, function(err, resp) {
+  var client = Influx({
+      // or single-host configuration
+      host : 'ec2-54-88-255-188.compute-1.amazonaws.com',
+      port : 8086, // optional, default 8086
+      protocol : 'http', // optional, default 'http'
+      username : 'root',
+      password : 'root',
+      database : myDB});
+ 
+  var point = {value: sinVal};
+
+  /*
+   * Not using promises 
+   * writePoint is not a promise
+   *     - could write code to wrap it in a promise but too much complexity
+   */
+  client.writePoint(seriesName, point, null, {db: myDB},
+    function(err, resp) {
       if (err) {
         console.log("error writing to DB", err);
-        return Parse.Promise.error('error writing to DB');
+        response.error(error);
+      } else {
+        response.success('Success');
       }
-      console.log(resp.toString());
-    });
-  }).then(function() {
-    // And we're done!
-    response.success('Success');
-  }, function(error) {
-    response.error(error);
   });
 });
