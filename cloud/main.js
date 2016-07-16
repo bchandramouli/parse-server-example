@@ -385,7 +385,7 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
   // each link in the chain of promise has a separate context.
   var sinVal = request.params.val;
 
-  var client = influx(influxDbUrl);
+  var client = Influx(influxDbUrl);
 
   Parse.Promise.as().then(function() {
     client.writePoint(seriesName, {value: sinVal}, function(err, resp) {
