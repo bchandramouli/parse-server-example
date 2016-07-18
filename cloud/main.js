@@ -397,7 +397,7 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
   var point = {value: sinVal};
 
   Parse.Promise.as().then(function() {
-    client.writePoint('sin', {value, 0.0}, 
+    client.writePoint('sin', {value: 0.0}, 
       function(err, resp) {
         if (err) {
           console.log("error writing to DB", err);
