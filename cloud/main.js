@@ -369,7 +369,7 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
 
 var Influx = require('influx');
 var myDB = 'test1';
-var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/${myDB}';
+var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/test1';
 var seriesName = 'sin'
 
 /**
