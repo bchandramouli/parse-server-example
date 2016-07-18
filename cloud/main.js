@@ -391,7 +391,7 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
       protocol : 'http', // optional, default 'http'
       // username : 'dbuser',
       // password : 'f4ncyp4ass',
-      database : myDB});
+      database : 'test1'});
 
 
   var point = {value: sinVal};
