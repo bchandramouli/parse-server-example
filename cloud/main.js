@@ -389,15 +389,15 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
       host : 'ec2-54-88-255-188.compute-1.amazonaws.com',
       port : 8086, // optional, default 8086
       protocol : 'http', // optional, default 'http'
-      // username : 'dbuser',
-      // password : 'f4ncyp4ass',
+      username : 'root',
+      password : 'root',
       database : 'test1'});
 
 
   var point = {value: sinVal};
 
   Parse.Promise.as().then(function() {
-    client.writePoint(seriesName, point, 
+    client.writePoint('sin', {value, 0.0}, 
       function(err, resp) {
         if (err) {
           console.log("error writing to DB", err);
