@@ -369,7 +369,7 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
 
 var Influx = require('influx');
 var myDB = 'test1';
-var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/test1';
+var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/${myDB}';
 var seriesName = 'sin'
 
 /**
@@ -384,7 +384,15 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
   // Top level variables used in the promise chain. Unlike callbacks,
   // each link in the chain of promise has a separate context.
   var sinVal = request.params.val;
-  var client = Influx(influxDbUrl);
+  var client = Influx({
+      // or single-host configuration
+      host : 'ec2-54-88-255-188.compute-1.amazonaws.com',
+      port : 8086, // optional, default 8086
+      protocol : 'http', // optional, default 'http'
+      // username : 'dbuser',
+      // password : 'f4ncyp4ass',
+      database : myDB});
+
 
   var point = {value: sinVal};
 
