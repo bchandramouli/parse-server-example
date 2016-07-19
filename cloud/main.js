@@ -380,7 +380,6 @@ var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/${myDB}
 Parse.Cloud.define('recordTSVal', function(request, response) {
   // Top level variables used in the promise chain. Unlike callbacks,
   // each link in the chain of promise has a separate context.
-
   var sinVal = request.params.val;
 
   var myDB = 'test1';
