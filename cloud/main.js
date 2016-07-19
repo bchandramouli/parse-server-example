@@ -405,7 +405,7 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
     function(err, resp) {
       if (err) {
         console.log("error writing to DB", err);
-        response.error(error);
+        response.error(err);
       } else {
         response.success('Success');
       }
