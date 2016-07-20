@@ -413,12 +413,12 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
 /**
  * Query the time series entries from the InfluxDB.
  *
- * Returns a set of data points in the last 24 hours
+ * Returns a set of data points in the last 1 hour
  */
 Parse.Cloud.define('queryTSVal', function(request, response) {
   // Top level variables used in the promise chain. Unlike callbacks,
   // each link in the chain of promise has a separate context.
-  var query = 'SELECT * FROM ' + seriesName + ' WHERE time > now() - 24h';
+  var query = 'SELECT * FROM ' + seriesName + ' WHERE time > now() - 1h';
 
   client.query(query,
     function(err, resp) {
