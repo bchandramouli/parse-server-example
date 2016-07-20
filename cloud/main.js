@@ -368,7 +368,17 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
 
 var Influx = require('influx');
 var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/${myDB}';
+var myDB = 'test1';
+var seriesName = 'sin'
 
+var client = Influx({
+      // or single-host configuration
+      host : 'ec2-54-88-255-188.compute-1.amazonaws.com',
+      port : 8086, // optional, default 8086
+      protocol : 'http', // optional, default 'http'
+      username : 'root',
+      password : 'root',
+      database : myDB});
 /**
  * Log a time series entry in the InfluxDB.
  *
@@ -382,18 +392,6 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
   // each link in the chain of promise has a separate context.
   var sinVal = request.params.val;
 
-  var myDB = 'test1';
-  var seriesName = 'sin'
-
-  var client = Influx({
-      // or single-host configuration
-      host : 'ec2-54-88-255-188.compute-1.amazonaws.com',
-      port : 8086, // optional, default 8086
-      protocol : 'http', // optional, default 'http'
-      username : 'root',
-      password : 'root',
-      database : myDB});
- 
   var point = {value: sinVal};
 
   /*
@@ -411,3 +409,25 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
       }
   });
 });
+
+/**
+ * Query the time series entries from the InfluxDB.
+ *
+ * Returns a set of data points in the last 24 hours
+ */
+Parse.Cloud.define('queryTSVal', function(request, response) {
+  // Top level variables used in the promise chain. Unlike callbacks,
+  // each link in the chain of promise has a separate context.
+  var query = 'SELECT * FROM ' + seriesName + ' WHERE time > now() - 24h';
+
+  client.query(query,
+    function(err, resp) {
+      if (err) {
+        console.log("error writing to DB", err);
+        response.error(err);
+      } else {
+        response.success(resp);
+      }
+  });
+});
+
