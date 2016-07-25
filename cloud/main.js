@@ -410,6 +410,7 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
   });
 });
 
+var assert = require('assert');
 /**
  * Query the time series entries from the InfluxDB.
  *
@@ -420,12 +421,14 @@ Parse.Cloud.define('queryTSVal', function(request, response) {
   // each link in the chain of promise has a separate context.
   var query = 'SELECT * FROM ' + seriesName + ' WHERE time > now() - 1h';
 
-  client.query(query,
+  client.query(query, 
     function(err, resp) {
       if (err) {
         console.log("error writing to DB", err);
         response.error(err);
       } else {
+        assert(resp instanceof Array);
+        console.log("response is", JSON.parse(resp));
         response.success(resp);
       }
   });
