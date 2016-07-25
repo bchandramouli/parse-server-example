@@ -410,7 +410,6 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
   });
 });
 
-var assert = require('assert');
 /**
  * Query the time series entries from the InfluxDB.
  *
@@ -427,8 +426,6 @@ Parse.Cloud.define('queryTSVal', function(request, response) {
         console.log("error writing to DB", err);
         response.error(err);
       } else {
-        assert(resp instanceof Array);
-        console.log("response is", JSON.parse(resp));
         response.success(resp);
       }
   });
