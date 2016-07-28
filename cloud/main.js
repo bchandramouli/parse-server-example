@@ -368,7 +368,8 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
 
 var Influx = require('influx');
 var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/${myDB}';
-var myDB = 'test1';
+var testDB = 'test1';
+var orderDB = 'orderDB';
 var seriesName = 'sin'
 
 var client = Influx({
@@ -378,7 +379,7 @@ var client = Influx({
       protocol : 'http', // optional, default 'http'
       username : 'root',
       password : 'root',
-      database : myDB});
+      database : testDB});
 /**
  * Log a time series entry in the InfluxDB.
  *
@@ -399,7 +400,7 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
    * writePoint is not a promise
    *     - could write code to wrap it in a promise but too much complexity
    */
-  client.writePoint(seriesName, point, null, {db: myDB},
+  client.writePoint(seriesName, point, null, {db: testDB},
     function(err, resp) {
       if (err) {
         console.log("error writing to DB", err);
@@ -420,7 +421,7 @@ Parse.Cloud.define('queryTSVal', function(request, response) {
   // each link in the chain of promise has a separate context.
   var query = 'SELECT * FROM ' + seriesName + ' WHERE time > now() - 1h';
 
-  client.query(query, 
+  client.query(query,
     function(err, resp) {
       if (err) {
         console.log("error writing to DB", err);
@@ -431,3 +432,84 @@ Parse.Cloud.define('queryTSVal', function(request, response) {
   });
 });
 
+var invSeriesName = "invCost";
+var totalSeriesName = "totalCost";
+
+/**
+ * Log an order value in the InfluxDB.
+ *
+ *  Expected input (in request.params):
+ *   cost         : cost for the order
+ *   home_id      : home tag
+ *   farm_id      : farm tag
+ *   inventory_id : inventory tag
+ *
+ * Simple cost record function - on success, "Success" will be returned.
+ */
+Parse.Cloud.define('recordInvCost', function(request, response) {
+  // Top level variables used in the promise chain. Unlike callbacks,
+  // each link in the chain of promise has a separate context.
+  
+  var cost = request.params.cost;
+  var homeId = request.params.homeId;
+  var farmId = request.params.farmId;
+  var invId = request.params.invId;
+  var point = {value: cost} 
+
+  /*
+   * Not using promises 
+   * writePoint is not a promise
+   *     - could write code to wrap it in a promise but too much complexity
+   */
+  client.writePoint(invSeriesName,
+    point, 
+    {homeId : homeId, farmId: farmId, invId: invId},
+    {db: orderDB},
+    function(err, resp) {
+      if (err) {
+        console.log("error writing to DB", err);
+        response.error(err);
+      } else {
+        response.success('Success');
+      }
+  });
+});
+
+/**
+ * Log total order value in the InfluxDB.
+ *
+ *  Expected input (in request.params):
+ *   cost         : cost for the order
+ *   home_id      : home tag
+ *   farm_id      : farm tag
+ *   inventory_id : inventory tag
+ *
+ * Simple cost record function - on success, "Success" will be returned.
+ */
+Parse.Cloud.define('recordTotalCost', function(request, response) {
+  // Top level variables used in the promise chain. Unlike callbacks,
+  // each link in the chain of promise has a separate context.
+  
+  var cost = request.params.cost;
+  var homeId = request.params.homeId;
+  var farmId = request.params.farmId;
+  var point = {value: cost} 
+
+  /*
+   * Not using promises 
+   * writePoint is not a promise
+   *     - could write code to wrap it in a promise but too much complexity
+   */
+  client.writePoint(totalSeriesName,
+    point, 
+    {homeId : homeId, farmId: farmId, invId: 'all'},
+    {db: orderDB},
+    function(err, resp) {
+      if (err) {
+        console.log("error writing to DB", err);
+        response.error(err);
+      } else {
+        response.success('Success');
+      }
+  });
+});
