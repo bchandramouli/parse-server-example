@@ -370,7 +370,13 @@ var Influx = require('influx');
 var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/${myDB}';
 var testDB = 'test1';
 var orderDB = 'orderDB';
-var seriesName = 'sin'
+var priceDB = 'priceDB'
+
+var invCostSeriesName = "invCost";
+var totalCostSeriesName = "totalCost";
+var invPriceSeriesName = "invPricing";
+
+var sinSeriesName = 'sin'
 
 var client = Influx({
       // or single-host configuration
@@ -380,6 +386,7 @@ var client = Influx({
       username : 'root',
       password : 'root',
       database : testDB});
+
 /**
  * Log a time series entry in the InfluxDB.
  *
@@ -400,7 +407,7 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
    * writePoint is not a promise
    *     - could write code to wrap it in a promise but too much complexity
    */
-  client.writePoint(seriesName, point, null, {db: testDB},
+  client.writePoint(sinSeriesName, point, null, {db: testDB},
     function(err, resp) {
       if (err) {
         console.log("error writing to DB", err);
@@ -410,30 +417,6 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
       }
   });
 });
-
-/**
- * Query the time series entries from the InfluxDB.
- *
- * Returns a set of data points in the last 1 hour
- */
-Parse.Cloud.define('queryTSVal', function(request, response) {
-  // Top level variables used in the promise chain. Unlike callbacks,
-  // each link in the chain of promise has a separate context.
-  var query = 'SELECT * FROM ' + seriesName + ' WHERE time > now() - 1h';
-
-  client.query(query,
-    function(err, resp) {
-      if (err) {
-        console.log("error writing to DB", err);
-        response.error(err);
-      } else {
-        response.success(resp);
-      }
-  });
-});
-
-var invSeriesName = "invCost";
-var totalSeriesName = "totalCost";
 
 /**
  * Log an order value in the InfluxDB.
@@ -461,7 +444,7 @@ Parse.Cloud.define('recordInvCost', function(request, response) {
    * writePoint is not a promise
    *     - could write code to wrap it in a promise but too much complexity
    */
-  client.writePoint(invSeriesName,
+  client.writePoint(invCostSeriesName,
     point, 
     {homeId : homeId, farmId: farmId, invId: invId},
     {db: orderDB},
@@ -500,7 +483,7 @@ Parse.Cloud.define('recordTotalCost', function(request, response) {
    * writePoint is not a promise
    *     - could write code to wrap it in a promise but too much complexity
    */
-  client.writePoint(totalSeriesName,
+  client.writePoint(totalCostSeriesName,
     point, 
     {homeId : homeId, farmId: farmId, invId: 'all'},
     {db: orderDB},
@@ -510,6 +493,66 @@ Parse.Cloud.define('recordTotalCost', function(request, response) {
         response.error(err);
       } else {
         response.success('Success');
+      }
+  });
+});
+
+/**
+ * Log a pricing value in the InfluxDB.
+ *
+ *  Expected input (in request.params):
+ *   price        : price of the inventory
+ *   farm_id      : farm tag
+ *   inventory_id : inventory tag
+ *
+ * Simple price record function - on success, "Success" will be returned.
+ */
+Parse.Cloud.define('recordInvPrice', function(request, response) {
+  // Top level variables used in the promise chain. Unlike callbacks,
+  // each link in the chain of promise has a separate context.
+  
+  var price = request.params.price;
+  var farmId = request.params.farmId;
+  var invId = request.params.invId;
+  var point = {value: price} 
+
+  /*
+   * Not using promises 
+   * writePoint is not a promise
+   *     - could write code to wrap it in a promise but too much complexity
+   */
+  client.writePoint(invPriceSeriesName,
+    point, 
+    {farmId: farmId, invId: invId},
+    {db: priceDB},
+    function(err, resp) {
+      if (err) {
+        console.log("error writing to DB", err);
+        response.error(err);
+      } else {
+        response.success('Success');
+      }
+  });
+});
+
+
+/**
+ * Query the time series entries from the InfluxDB.
+ *
+ * Returns a set of data points in the last 1 hour
+ */
+Parse.Cloud.define('queryTSVal', function(request, response) {
+  // Top level variables used in the promise chain. Unlike callbacks,
+  // each link in the chain of promise has a separate context.
+  var query = 'SELECT * FROM ' + sinSeriesName + ' WHERE time > now() - 1h';
+
+  client.query(query,
+    function(err, resp) {
+      if (err) {
+        console.log("error writing to DB", err);
+        response.error(err);
+      } else {
+        response.success(resp);
       }
   });
 });
