@@ -453,6 +453,7 @@ Parse.Cloud.define('recordInvCost', function(request, response) {
         console.log("error writing to DB", err);
         response.error(err);
       } else {
+        console.log(resp);
         response.success('Success');
       }
   });
@@ -542,9 +543,34 @@ Parse.Cloud.define('recordInvPrice', function(request, response) {
  * Returns a set of data points in the last 1 hour
  */
 Parse.Cloud.define('queryTSVal', function(request, response) {
-  // Top level variables used in the promise chain. Unlike callbacks,
-  // each link in the chain of promise has a separate context.
-  var query = 'SELECT * FROM ' + sinSeriesName + ' WHERE time > now() - 1h';
+  var query = 'SELECT * FROM ' + sinSeriesName + 
+    ' WHERE time > now() - 1h';
+
+  client.query(query,
+    function(err, resp) {
+      if (err) {
+        console.log("error writing to DB", err);
+        response.error(err);
+      } else {
+        response.success(resp);
+      }
+  });
+});
+
+
+/**
+ * Query the cost entries from the InfluxDB.
+ *  Expected input (in request.params):
+ *   farm_id      : farm tag
+ *
+ * Returns a set of data points in the last 1 hour
+ */
+Parse.Cloud.define('queryInvCost', function(request, response) {
+
+  var farmId = request.params.farmId;
+
+  var query = 'SELECT  FROM ' + invCostSeriesName +
+   '; SELECT AVG(VALUE) as avgvalue from' + invCostSeriesName + ' WHERE farmId = ' + farmId;
 
   client.query(query,
     function(err, resp) {
