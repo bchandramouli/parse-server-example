@@ -135,9 +135,9 @@ function stringifyHomeInventory(homeInv, price) {
         " * " +
         homeInv[i].get("homeCount").toString() +
         " @ $" +
-        homeInv[i].get("rate").toString() +
+        homeInv[i].get("farmInv").get("rate").toString() +
         "/" +
-        homeInv[i].get("unit") +
+        homeInv[i].get("farmInv").get("unit") +
         "\n\n";
   }
 
@@ -150,7 +150,7 @@ function getHomeInventoryPrice(homeInv) {
   var price = 0;
 
   for (var i = 0 ; i < homeInv.length; i++) {
-    price = price + homeInv[i].get("rate") * homeInv[i].get("homeCount");
+    price = price + homeInv[i].get("farmInv").get("rate") * homeInv[i].get("homeCount");
   }
   return price;
 }
@@ -187,6 +187,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     // Find the item to purchase.
     homeQuery.equalTo("objectId", request.params.homeId);
     homeQuery.include("homeInventory");
+    homeQuery.include("homeInventory.farmInv");
 
     /**
      * Find the resuts. We handle the error here so our
