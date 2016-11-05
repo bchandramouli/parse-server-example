@@ -128,7 +128,7 @@ var Mailgun = require('mailgun-js')({apiKey: "key-afab485a6a9bf921692f83c3c1d03b
                                      domain: "sandboxd6cc36b660184159bc67c3f403466981.mailgun.org"});
 
 function stringifyHomeInventory(homeInv, price) {
-  var orderStringified;
+  var orderStringified = "";
   for (var i = 0 ; i < homeInv.length; i++) {
        orderStringified = orderStringified +
         homeInv[i].get("farmInv").get("name") +
@@ -217,8 +217,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     price = getHomeInventoryPrice(inventory);
     orderString = stringifyHomeInventory(inventory, price);
 
-    console.log("home found");
-
     // We have items left! Let's create our order item before
     // charging the credit card (just to be safe).
     order = new Parse.Object('Order');
@@ -252,8 +250,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     // Credit card charged! Now we save the ID of the purchase on our
     // order and mark it as 'charged'.
 
-    console.log("order charged");
-
     order.set('stripePaymentId', purchase.id);
     order.set('charged', true);
 
@@ -275,8 +271,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   }).then(function(order) {
     // Credit card charged and order item updated properly!
     // We're done, so let's send an email to the user.
-
-    console.log("order saved");
 
     // Generate the email body string.
     var body = "We've received and processed your order for the following items: \n\n" +
