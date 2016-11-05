@@ -218,7 +218,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     price = getHomeInventoryPrice(inventory);
     orderString = stringifyHomeInventory(inventory, price);
 
-    console.log("home found");
 
     // We have items left! Let's create our order item before
     // charging the credit card (just to be safe).
@@ -253,8 +252,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     // Credit card charged! Now we save the ID of the purchase on our
     // order and mark it as 'charged'.
 
-    console.log("order charged");
-
     order.set('stripePaymentId', purchase.id);
     order.set('charged', true);
 
@@ -276,8 +273,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   }).then(function(order) {
     // Credit card charged and order item updated properly!
     // We're done, so let's send an email to the user.
-
-    console.log("order saved");
 
     // Generate the email body string.
     var body = "We've received and processed your order for the following items: \n\n" +
@@ -321,7 +316,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
    */
   }, function(error) {
 
-    console.log("parse error", error);
     response.error(error);
 
   });
@@ -376,7 +370,7 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
 
 var Influx = require('influx');
 var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/${myDB}';
-var testDB = 'test1';
+var myDB = 'test1';
 var orderDB = 'orderDB';
 var priceDB = 'priceDB'
 
