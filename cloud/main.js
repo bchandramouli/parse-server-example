@@ -130,7 +130,7 @@ var Mailgun = require('mailgun-js')({apiKey: "key-afab485a6a9bf921692f83c3c1d03b
 function stringifyHomeInventory(homeInv, price) {
   var orderStringified = "";
   for (var i = 0 ; i < homeInv.length; i++) {
-    console.log("home inv = ", homeInv[i].toString());
+    console.log("home inv = ", JSON.stringify(homeInv[i]));
        orderStringified = orderStringified +
         homeInv[i].get("name") +
         " * " +
