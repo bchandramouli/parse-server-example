@@ -141,6 +141,7 @@ function stringifyHomeInventory(homeInv, price) {
         homeInv[i].get("farmInv").get("unit") +
         "\n\n";
   }
+  console.log("order is", orderStringified);
 
   orderStringified = orderStringified + "\n" + "Total Price: $" + price.toString() + "\n";
 
