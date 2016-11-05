@@ -214,6 +214,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
     home = result;
     var inventory = home.get("homeInventory");
+    console.log(inventory.toString());
     price = getHomeInventoryPrice(inventory);
     orderString = stringifyHomeInventory(inventory, price);
 
@@ -386,7 +387,7 @@ var client = Influx({
       protocol : 'http', // optional, default 'http'
       username : 'root',
       password : 'root',
-      database : testDB});
+      database : myDB});
 
 /**
  * Log a time series entry in the InfluxDB.
@@ -408,7 +409,7 @@ Parse.Cloud.define('recordTSVal', function(request, response) {
    * writePoint is not a promise
    *     - could write code to wrap it in a promise but too much complexity
    */
-  client.writePoint(sinSeriesName, point, null, {db: testDB},
+  client.writePoint(sinSeriesName, point, null, {db: myDB},
     function(err, resp) {
       if (err) {
         console.log("error writing to DB", err);
