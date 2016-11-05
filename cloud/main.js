@@ -131,7 +131,7 @@ function stringifyHomeInventory(homeInv, price) {
   var orderStringified;
   for (var i = 0 ; i < homeInv.length; i++) {
        orderStringified = orderStringified +
-        homeInv[i].get("name") +
+        homeInv[i].get("farmInv").get("name") +
         " * " +
         homeInv[i].get("homeCount").toString() +
         " @ $" +
@@ -214,7 +214,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
     home = result;
     var inventory = home.get("homeInventory");
-    console.log(inventory.toString());
     price = getHomeInventoryPrice(inventory);
     orderString = stringifyHomeInventory(inventory, price);
 
@@ -345,10 +344,8 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
   var userEmail = request.params.userEmail;
   var userCode = request.params.userCode;
 
-  console.log("in verify email", request.toString());
-
   // Let's send an email to the user.
-
+  
   // Generate the email body string.
   var body = "Hi,\n\n" +
              "The confirmation code for your FarmView App registration is: " +
