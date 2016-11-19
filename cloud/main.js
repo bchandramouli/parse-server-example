@@ -152,16 +152,13 @@ function getHomeInventoryPrice(order) {
 
   orderPerFarms = order.get("orderFarms");
   for (var i = 0; i < orderPerFarms.length; i++) {
-    OrderPerFarm opf = orderPerFarms[i].fetchIfNeeded().then(null, null) { 
-      hInvList = opf.getHomeInventory();
-      for (var j = 0; j < hInvList.length; j++) {
-        hInv = hInvList.get(j).fetchIfNeeded().then(null, null) {
-          hInv.getFarmInventory().fetchIfNeeded().then(null, null) {
-            price = price + hInv.get("farmInv").get("rate") * hInv.get("homeCount");
-          };
-        };
-      }
-    };
+    opf = orderPerFarms[i].fetch(); 
+    hInvList = opf.getHomeInventory();
+    for (var j = 0; j < hInvList.length; j++) {
+      hInv = hInvList.get(j).fetch();
+      hInv.getFarmInventory().fetch();
+      price = price + hInv.get("farmInv").get("rate") * hInv.get("homeCount");
+    }
   }
   return price;
 }
