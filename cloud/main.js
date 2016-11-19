@@ -106,15 +106,15 @@ Parse.Cloud.define('echoKeys', function(req, res){
     applicationId: Parse.applicationId,
     masterKey: Parse.masterKey,
     javascriptKey: Parse.javascriptKey
-  })
+  });
 });
 
 Parse.Cloud.define('createBeforeSaveChangedObject', function(req, res){
   var obj = new Parse.Object('BeforeSaveChanged');
   obj.save().then(() => {
     res.success(obj);
-  })
-})
+  });
+});
 
 
 /**
@@ -129,38 +129,63 @@ var Mailgun = require('mailgun-js')({apiKey: "key-afab485a6a9bf921692f83c3c1d03b
 
 function stringifyHomeInventory(order, price) {
   var orderStringified = "";
-  /*
-  for (var i = 0 ; i < homeInv.length; i++) {
+
+  var orderPerFarms = order.get("orderFarms");
+  for (var i = 0 ; i < orderPerFarms.length; i++) {
+    var hInvList = orderPerFarms[i].get("homeInventory");
+    
+    for (var j = 0 ; j < hInvList.length; j++) {
+      var hInv = hInvList[j];
+      var fInv = hInv.get("farmInv");
+
        orderStringified = orderStringified +
-        homeInv[i].get("farmInv").get("name") +
+        fInv.get("name") +
         " * " +
-        homeInv[i].get("homeCount").toString() +
+        hInv.get("homeCount").toString() +
         " @ $" +
-        homeInv[i].get("farmInv").get("rate").toString() +
+        fInv.get("rate").toString() +
         "/" +
-        homeInv[i].get("farmInv").get("unit") +
+        fInv.get("unit") +
         "\n\n";
+    }
   }
-  */
   orderStringified = orderStringified + "\n" + "Total Price: $" + price.toString() + "\n";
 
   return orderStringified;
 }
 
 function getHomeInventoryPrice(order) {
-  var price = 0.0;
+  var price = 0;
+  var orderPerFarms = order.get("orderFarms");
 
-  orderPerFarms = order.get("orderFarms");
-  for (var i = 0; i < orderPerFarms.length; i++) {
-    opf = orderPerFarms[i].fetch(); 
-    hInvList = opf.getHomeInventory();
-    for (var j = 0; j < hInvList.length; j++) {
-      hInv = hInvList.get(j).fetch();
-      hInv.getFarmInventory().fetch();
-      price = price + hInv.get("farmInv").get("rate") * hInv.get("homeCount");
+  for (var i = 0 ; i < orderPerFarms.length; i++) {
+    var hInvList = orderPerFarms[i].get("homeInventory");
+
+    for (var j = 0 ; j < hInvList.length; j++) {
+      var hInv = hInvList[j];
+      var fInv = hInv.get("farmInv");
+
+      price = price + fInv.get("rate") * hInv.get("homeCount");
     }
   }
   return price;
+}
+
+function fetchCompleteOrder(order) {
+  var promise_array = [];
+  var orderPerFarms = order.get("orderFarms");
+
+  for (var i = 0 ; i < orderPerFarms.length; i++) {
+    var hInvList = orderPerFarms[i].get("homeInventory");
+
+    for (var j = 0 ; j < hInvList.length; j++) {
+      var hInv = hInvList[j];
+      var fInv = hInv.get("farmInv");
+      promise_array.push(fInv.fetch());
+    }
+  }
+  
+  return Parse.Promise.when(promise_array);
 }
 
 /**
@@ -170,6 +195,8 @@ function getHomeInventoryPrice(order) {
  *  Expected input (in request.params):
  *   homeId         : String, to retrieve the home details
  *   cardToken      : String, the credit card token returned to the client from Stripe
+ *   savedCard      : Boolean, indicating a previously used card is being used
+ *   customerId     : String, Stripe Opaque data, for a previously used card
  *
  * Also, please note that on success, "Success" will be returned.
  */
@@ -182,7 +209,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
   // Top level variables used in the promise chain. Unlike callbacks,
   // each link in the chain of promise has a separate context.
-  var home, order, orderString;
+  var order, orderString; 
   var price = 0;
 
   var cardToken = request.params.cardToken;
@@ -191,11 +218,12 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   // asynchronous code consistent. This is not required.
   Parse.Promise.as().then(function() {
 
-    var homeQuery = new Parse.Query('Homes');
+    var orderQuery = new Parse.Query('Order');
     // Find the item to purchase.
-    homeQuery.equalTo("objectId", request.params.homeId);
-    homeQuery.include("currentOrder");
-    homeQuery.include("currentOrder.orderFarms");
+    orderQuery.equalTo("objectId", request.params.orderId);
+    orderQuery.include("orderFarms");
+    orderQuery.include("orderFarms.homeInventory");
+    orderQuery.include("orderFarms.homeInventory.farmInv");
 
     /**
      * Find the resuts. We handle the error here so our
@@ -203,26 +231,30 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
      * Notice we do this for all asynchronous calls since we
      * want to handle the error differently each time.
      */
-    home = homeQuery.find().then(null, function(error) {
-      console.log("could not find the home rec", error);
+    order = orderQuery.find().then(null, function(error) {
+      console.log("could not find the order rec", error);
     });
 
-    return homeQuery.first().then(null, function (error) {
-        return Parse.Promise.error('DB query failed? - The home record query failure.');
+    return orderQuery.first().then(null, function (error) {
+        console.log("could not find the order", error);
+        return Parse.Promise.error('DB query failed? - Order query failure.');
     });
 
-    //.then(null, function(error) {
-    // return Parse.Promise.error('DB query failed? - The home record query failure.');
-    // });
   }).then(function(result) {
     // Make sure we found an item.
     if (!result) {
-      return Parse.Promise.error('Sorry, the home record is no longer available.');
+      return Parse.Promise.error('Sorry, the order is no longer available.');
     }
 
-    home = result;
+    order = result;
 
-    var order = home.get("currentOrder");
+    return fetchCompleteOrder(order).then(function() {
+      return order;
+    }, function (error) {
+      console.log('Could not fetch all inventory ' + error);
+      return Parse.Promise.error('Could not fetch all the inventory');
+    });
+  }).then(function(order) {
 
     price = getHomeInventoryPrice(order);
     orderString = stringifyHomeInventory(order, price);
@@ -231,7 +263,9 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     return Stripe.charges.create({
       amount: price * 100, // express dollars in cents
       currency: 'usd',
-      card: cardToken
+      source: cardToken,
+      description: order.get("email"), // Save the customer's email in description!
+      metadata: {'order_id': request.params.orderId} // Save orderId, to correlate all orders for a user
     }).then(null, function(error) {
       console.log('Charging with stripe failed. Error: ' + error);
       return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
@@ -256,7 +290,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
       console.log("order save screwup \n");
 
       return Parse.Promise.error('A critical error has occurred with your order. Please ' +
-                                 'contact reachorchardview@gmail.com at your earliest convinience. ');
+                                 'contact reachforagers@gmail.com at your earliest convinience. ');
     });
 
   }).then(function(order) {
@@ -268,21 +302,19 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
                orderString + "\n";
 
     body += "Shipping Address: \n" +
-            home.get("owner") + "\n" +
-            home.get("address") + "\n" +
-            "Mountain View, CA " + home.get("zip") + "\n" +
-            "United States, " + "\n" +
-            "\nWe will deliver your item by 2 pm today. " +
+            order.get("owner") + "\n" +
+            order.get("address") + "\n" +
+            "\nWe will deliver your item by 6 pm today. " +
             "Let us know if you have any questions!\n\n" +
             "Thank you,\n" +
-            "The FarmView Team";
+            "Foragers";
 
     // Send the email.
     return Mailgun.messages().send({
-      from: 'reachorchardview@gmail.com',
+      from: 'reachforagers@gmail.com',
       // to: home.get("email"),
-      to: 'reachorchardview@gmail.com', // hack - the mailgun sandbox only allows approved emails
-      cc: 'reachorchardview@gmail.com',
+      to: order.get("email"), // hack - the mailgun sandbox only allows approved emails
+      cc: 'reachforagers@gmail.com',
       subject: 'Your farmer\'s market inventory was processed!',
       text: body
     }).then(null, function(error) {
@@ -290,7 +322,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
       console.log("email send failure", error);
 
       return Parse.Promise.error('Your purchase was successful, but we were not able to ' +
-                                 'send you an email. Contact us at reachorchardview@gmail.com if ' +
+                                 'send you an email. Contact us at reachforagers@gmail.com if ' +
                                  'you have any questions.');
     });
 
@@ -306,7 +338,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   }, function(error) {
 
     response.error(error);
-
   });
 });
 
@@ -332,19 +363,19 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
   
   // Generate the email body string.
   var body = "Hi,\n\n" +
-             "The confirmation code for your FarmView App registration is: " +
+             "The confirmation code for your Forage App is: " +
              userCode + "\n\n";
 
   body += "Thank you,\n" +
-          "The FarmView Team";
+          "Foragers";
 
   // Send the email.
   Mailgun.messages().send({
-    from: 'reachorchardview@gmail.com',
+    from: 'reachforagers@gmail.com',
     //to: home.get("email"),
     to: userEmail, // hack - the mailgun sandbox only allows approved emails
-    cc: 'reachorchardview@gmail.com',
-    subject: 'Your FarmView registration code!',
+    cc: 'reachforagers@gmail.com',
+    subject: 'Your Forage registration code!',
     text: body
   }).then(function() {
     response.success('Success');
@@ -359,13 +390,13 @@ var Influx = require('influx');
 var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/${myDB}';
 var myDB = 'test1';
 var orderDB = 'orderDB';
-var priceDB = 'priceDB'
+var priceDB = 'priceDB';
 
 var invCostSeriesName = "invCost";
 var totalCostSeriesName = "totalCost";
 var invPriceSeriesName = "invPricing";
 
-var sinSeriesName = 'sin'
+var sinSeriesName = 'sin';
 
 var client = Influx({
       // or single-host configuration
@@ -426,7 +457,7 @@ Parse.Cloud.define('recordInvCost', function(request, response) {
   var homeId = request.params.homeId;
   var farmId = request.params.farmId;
   var invId = request.params.invId;
-  var point = {value: cost} 
+  var point = {value: cost};
 
   /*
    * Not using promises 
@@ -466,7 +497,7 @@ Parse.Cloud.define('recordTotalCost', function(request, response) {
   var cost = request.params.cost;
   var homeId = request.params.homeId;
   var farmId = request.params.farmId;
-  var point = {value: cost} 
+  var point = {value: cost};
 
   /*
    * Not using promises 
@@ -504,7 +535,7 @@ Parse.Cloud.define('recordInvPrice', function(request, response) {
   var price = request.params.price;
   var farmId = request.params.farmId;
   var invId = request.params.invId;
-  var point = {value: price} 
+  var point = {value: price};
 
   /*
    * Not using promises 
