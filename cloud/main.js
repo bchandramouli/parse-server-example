@@ -127,8 +127,9 @@ var Stripe = require('stripe')("sk_test_3n3xj9zbj6hOkEhngx7uITeH");
 var Mailgun = require('mailgun-js')({apiKey: "key-afab485a6a9bf921692f83c3c1d03b56",
                                      domain: "sandboxd6cc36b660184159bc67c3f403466981.mailgun.org"});
 
-function stringifyHomeInventory(homeInv, price) {
+function stringifyHomeInventory(order, price) {
   var orderStringified = "";
+  /*
   for (var i = 0 ; i < homeInv.length; i++) {
        orderStringified = orderStringified +
         homeInv[i].get("farmInv").get("name") +
@@ -140,16 +141,27 @@ function stringifyHomeInventory(homeInv, price) {
         homeInv[i].get("farmInv").get("unit") +
         "\n\n";
   }
+  */
   orderStringified = orderStringified + "\n" + "Total Price: $" + price.toString() + "\n";
 
   return orderStringified;
 }
 
-function getHomeInventoryPrice(homeInv) {
-  var price = 0;
+function getHomeInventoryPrice(order) {
+  var price = 0.0;
 
-  for (var i = 0 ; i < homeInv.length; i++) {
-    price = price + homeInv[i].get("farmInv").get("rate") * homeInv[i].get("homeCount");
+  orderPerFarms = order.get("orderFarms");
+  for (var i = 0; i < orderPerFarms.length; i++) {
+    OrderPerFarm opf = orderPerFarms[i].fetchIfNeeded().then(null, null) { 
+      hInvList = opf.getHomeInventory();
+      for (var j = 0; j < hInvList.length; j++) {
+        hInv = hInvList.get(j).fetchIfNeeded().then(null, null) {
+          hInv.getFarmInventory().fetchIfNeeded().then(null, null) {
+            price = price + hInv.get("farmInv").get("rate") * hInv.get("homeCount");
+          };
+        };
+      }
+    };
   }
   return price;
 }
@@ -185,8 +197,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     var homeQuery = new Parse.Query('Homes');
     // Find the item to purchase.
     homeQuery.equalTo("objectId", request.params.homeId);
-    homeQuery.include("homeInventory");
-    homeQuery.include("homeInventory.farmInv");
+    homeQuery.include("currentOrder");
+    homeQuery.include("currentOrder.orderFarms");
 
     /**
      * Find the resuts. We handle the error here so our
@@ -212,30 +224,13 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     }
 
     home = result;
-    var inventory = home.get("homeInventory");
-    price = getHomeInventoryPrice(inventory);
-    orderString = stringifyHomeInventory(inventory, price);
 
-    // We have items left! Let's create our order item before
-    // charging the credit card (just to be safe).
-    order = new Parse.Object('Order');
-    order.set('name', home.get("owner"));
-    order.set('email', home.get("email"));
-    order.set('orderString', orderString);
-    order.set('address', home.get("address"));
-    order.set('fulfilled', false);
-    order.set('charged', false); // set to false until we actually charge the card
+    var order = home.get("currentOrder");
 
-    // Create new order
-    return order.save().then(null, function(error) {
-      // This would be a good place to replenish the quantity we've removed.
-      // We've ommited this step in this app.
-      return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
-    });
+    price = getHomeInventoryPrice(order);
+    orderString = stringifyHomeInventory(order, price);
 
-  }).then(function(order) {
     // Now we can charge the credit card using Stripe and the credit card token.
-
     return Stripe.charges.create({
       amount: price * 100, // express dollars in cents
       currency: 'usd',
