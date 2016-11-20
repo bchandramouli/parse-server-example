@@ -263,7 +263,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     return Stripe.charges.create({
       amount: price * 100, // express dollars in cents
       currency: 'usd',
-      token: cardToken,
+      card: cardToken,
       description: order.get("email"), // Save the customer's email in description!
       metadata: {'order_id': request.params.orderId} // Save orderId, to correlate all orders for a user
     }).then(null, function(error) {
