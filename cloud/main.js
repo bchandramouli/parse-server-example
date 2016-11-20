@@ -264,8 +264,10 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
       amount: price * 100, // express dollars in cents
       currency: 'usd',
       card: cardToken,
+      /*
       description: order.get("email"), // Save the customer's email in description!
       metadata: {'order_id': request.params.orderId} // Save orderId, to correlate all orders for a user
+      */
     }).then(null, function(error) {
       console.log('Charging with stripe failed. Error: ' + error);
       return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
