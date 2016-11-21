@@ -132,7 +132,7 @@ function stringifyHomeInventory(order, price) {
 
   var orderPerFarms = order.get("orderFarms");
   for (var i = 0 ; i < orderPerFarms.length; i++) {
-    var hInvList = orderPerFarms[i].get("homeInventory");
+    var hInvList = orderPerFarms[i].get("homeInventories");
     
     for (var j = 0 ; j < hInvList.length; j++) {
       var hInv = hInvList[j];
@@ -159,7 +159,7 @@ function getHomeInventoryPrice(order) {
   var orderPerFarms = order.get("orderFarms");
 
   for (var i = 0 ; i < orderPerFarms.length; i++) {
-    var hInvList = orderPerFarms[i].get("homeInventory");
+    var hInvList = orderPerFarms[i].get("homeInventories");
 
     for (var j = 0 ; j < hInvList.length; j++) {
       var hInv = hInvList[j];
@@ -176,7 +176,7 @@ function fetchCompleteOrder(order) {
   var orderPerFarms = order.get("orderFarms");
 
   for (var i = 0 ; i < orderPerFarms.length; i++) {
-    var hInvList = orderPerFarms[i].get("homeInventory");
+    var hInvList = orderPerFarms[i].get("homeInventories");
 
     for (var j = 0 ; j < hInvList.length; j++) {
       var hInv = hInvList[j];
@@ -222,8 +222,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     // Find the item to purchase.
     orderQuery.equalTo("objectId", request.params.orderId);
     orderQuery.include("orderFarms");
-    orderQuery.include("orderFarms.homeInventory");
-    orderQuery.include("orderFarms.homeInventory.farmInv");
+    orderQuery.include("orderFarms.homeInventories");
+    orderQuery.include("orderFarms.homeInventories.farmInv");
 
     /**
      * Find the resuts. We handle the error here so our
@@ -258,6 +258,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
     price = getHomeInventoryPrice(order);
     orderString = stringifyHomeInventory(order, price);
+
+    console.log("price is", price);
 
     // Now we can charge the credit card using Stripe and the credit card token.
     return Stripe.charges.create({
@@ -316,7 +318,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
       from: 'reachforagers@gmail.com',
       // to: home.get("email"),
       to: order.get("email"), // hack - the mailgun sandbox only allows approved emails
-      cc: 'reachforagers@gmail.com',
+      cc: 'reachorchardview@gmail.com',
       subject: 'Your farmer\'s market inventory was processed!',
       text: body
     }).then(null, function(error) {
