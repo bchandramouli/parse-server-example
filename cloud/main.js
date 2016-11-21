@@ -304,8 +304,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
                orderString + "\n";
 
     body += "Shipping Address: \n" +
-            order.get("owner") + "\n" +
-            order.get("address") + "\n" +
+            order.get("homeName") + "\n" +
+            order.get("homeAddress") + "\n" +
             "\nWe will deliver your item by 6 pm today. " +
             "Let us know if you have any questions!\n\n" +
             "Thank you,\n" +
