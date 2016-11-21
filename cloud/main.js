@@ -265,11 +265,9 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     return Stripe.charges.create({
       amount: price * 100, // express dollars in cents
       currency: 'usd',
-      card: cardToken
-      /*
+      card: cardToken,
       description: order.get("email"), // Save the customer's email in description!
       metadata: {'order_id': request.params.orderId} // Save orderId, to correlate all orders for a user
-      */
     }).then(null, function(error) {
       console.log('Charging with stripe failed. Error: ' + error);
       return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
@@ -317,7 +315,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     return Mailgun.messages().send({
       from: 'reachforagers@gmail.com',
       // to: home.get("email"),
-      to: order.get("email"), // hack - the mailgun sandbox only allows approved emails
+      to: 'reachforagers@gmail.com', // order.get("email") hack - the mailgun sandbox only allows approved emails
       cc: 'reachorchardview@gmail.com',
       subject: 'Your farmer\'s market inventory was processed!',
       text: body
