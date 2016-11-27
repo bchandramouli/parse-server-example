@@ -211,8 +211,14 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   // each link in the chain of promise has a separate context.
   var order, orderString; 
   var price = 0;
+  var customerId = "Forage_dummy";
 
+  var orderId = request.params.orderId;
   var cardToken = request.params.cardToken;
+  var savedCard = request.params.savedCard;
+  if (savedCard) {
+    customerId = request.params.customerId;
+  }
 
   // We start in the context of a promise to keep all the
   // asynchronous code consistent. This is not required.
@@ -220,7 +226,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
     var orderQuery = new Parse.Query('Order');
     // Find the item to purchase.
-    orderQuery.equalTo("objectId", request.params.orderId);
+    orderQuery.equalTo("objectId", orderId);
     orderQuery.include("orderFarms");
     orderQuery.include("orderFarms.homeInventories");
     orderQuery.include("orderFarms.homeInventories.farmInv");
@@ -259,24 +265,45 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     price = getHomeInventoryPrice(order);
     orderString = stringifyHomeInventory(order, price);
 
-    console.log("price is", price);
+    if (savedCard) {
+      // Charge the customer again, retrieve the customer ID!
+      return Stripe.charges.create({
+          amount: price * 100, // express dollars in cents
+          currency: "usd",
+          customer: customerId, // Previously stored, then retrieved
+          metadata: {'order_id': orderId} // Save orderId, to correlate all orders for a user
+        }).then(null, function(error) {
+          console.log('Charging with stripe failed. Error: ' + error);
+          return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
+        });
+    } else {
+      var custEmail = order.get("homeEmail");
+      var custDesc = 'Customer for ' + custEmail;
+      // Create a new Stripe customer!
+      return Stripe.customers.create({
+        source: cardToken,
+        description: custDesc,
+        email: custEmail // Save the customer's email
+      }).then(function(customer) {
+        // Save the Id!
+        customerId = customer.id;
 
-    // Now we can charge the credit card using Stripe and the credit card token.
-    return Stripe.charges.create({
-      amount: price * 100, // express dollars in cents
-      currency: 'usd',
-      card: cardToken,
-      description: order.get("email"), // Save the customer's email in description!
-      metadata: {'order_id': request.params.orderId} // Save orderId, to correlate all orders for a user
-    }).then(null, function(error) {
-      console.log('Charging with stripe failed. Error: ' + error);
-      return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
-    });
-
+        return Stripe.charges.create({
+          amount: price * 100, // express dollars in cents
+          currency: "usd",
+          customer: customerId,
+          metadata: {'order_id': orderId} // Save orderId, to correlate all orders for a user
+          }).then(null, function(error) {
+            console.log('Charging with stripe failed. Error: ' + error);
+            return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
+          });
+        });
+    }
   }).then(function(purchase) {
+
     // Credit card charged! Now we save the ID of the purchase on our
     // order and mark it as 'charged'.
-
+    order.set('customerId', customerId);
     order.set('stripePaymentId', purchase.id);
     order.set('charged', true);
 
@@ -288,27 +315,27 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
        * details of their credit card (last 4 digits) and we can then find the payment
        * on Stripe's dashboard to confirm which order to rectify.
        */
-
       console.log("order save screwup \n");
 
-      return Parse.Promise.error('A critical error has occurred with your order. Please ' +
-                                 'contact reachforagers@gmail.com at your earliest convinience. ');
+      return Parse.Promise.error('A critical error has occurred with your order #' + orderId +
+                                 ' . Please contact reachforagers@gmail.com. ');
     });
 
   }).then(function(order) {
+
     // Credit card charged and order item updated properly!
     // We're done, so let's send an email to the user.
 
     // Generate the email body string.
-    var body = "We've received and processed your order for the following items: \n\n" +
+    var body = "We've received and processed your order" + orderId + " for the following items: \n\n" +
                orderString + "\n";
 
     body += "Shipping Address: \n" +
             order.get("homeName") + "\n" +
             order.get("homeAddress") + "\n" +
-            "\nWe will deliver your item by 6 pm today. " +
-            "Let us know if you have any questions!\n\n" +
-            "Thank you,\n" +
+            "\nWe will deliver your order by 6 pm today. " +
+            "Thank you for shopping with Forage!\n\n" +
+            "Packing with care,\n" +
             "Foragers";
 
     // Send the email.
@@ -317,26 +344,26 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
       // to: home.get("email"),
       to: 'reachforagers@gmail.com', // order.get("email") hack - the mailgun sandbox only allows approved emails
       cc: 'reachorchardview@gmail.com',
-      subject: 'Your farmer\'s market inventory was processed!',
+      subject: 'Your farmer\'s market order' + orderId + ' has been processed!',
       text: body
     }).then(null, function(error) {
 
       console.log("email send failure", error);
 
       return Parse.Promise.error('Your purchase was successful, but we were not able to ' +
-                                 'send you an email. Contact us at reachforagers@gmail.com if ' +
-                                 'you have any questions.');
+                                 'send you an email. Please contact us at reachforagers@gmail.com.');
     });
 
   }).then(function() {
-    // And we're done!
-    response.success('Success');
 
-  /**
-   * Any promise that throws an error will propagate to this handler.
-   * We use it to return the error from our Cloud Function using the
-   * message we individually crafted based on the failure above.
-   */
+    // And we're done - send the customer Id back!
+    response.success(customerId);
+
+    /**
+     * Any promise that throws an error will propagate to this handler.
+     * We use it to return the error from our Cloud Function using the
+     * message we individually crafted based on the failure above.
+     */
   }, function(error) {
 
     response.error(error);
