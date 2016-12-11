@@ -213,6 +213,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   var price = 0;
   var customerId = "Forage_dummy";
 
+  var custEmail = 'reachforagers@gmail.com';
+
   var orderId = request.params.orderId;
   var cardToken = request.params.cardToken;
   var savedCard = request.params.savedCard;
@@ -277,7 +279,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
           return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
         });
     } else {
-      var custEmail = order.get("homeEmail");
+      custEmail = order.get("homeEmail");
       var custDesc = 'Customer for ' + custEmail;
       // Create a new Stripe customer!
       return Stripe.customers.create({
@@ -342,8 +344,9 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     return Mailgun.messages().send({
       from: 'reachforagers@gmail.com',
       // to: home.get("email"),
-      to: 'reachforagers@gmail.com', // order.get("email") hack - the mailgun sandbox only allows approved emails
-      cc: 'reachorchardview@gmail.com',
+      to: custEmail, // order.get("email") hack - the mailgun sandbox only allows approved emails
+      cc: 'reachforagers@gmail.com',
+      bcc: 'reachorchardview@gmail.com',
       subject: 'Your farmer\'s market order' + orderId + ' has been processed!',
       text: body
     }).then(null, function(error) {
