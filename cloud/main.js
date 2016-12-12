@@ -127,6 +127,9 @@ var Stripe = require('stripe')("sk_test_3n3xj9zbj6hOkEhngx7uITeH");
 var Mailgun = require('mailgun-js')({apiKey: "key-afab485a6a9bf921692f83c3c1d03b56",
                                      domain: "sandboxd6cc36b660184159bc67c3f403466981.mailgun.org"});
 
+var FORAGE_EMAIL = 'reachforagers@gmail.com';
+var ORCHVIEW_EMAIL = 'reachorchardview@gmail.com';
+
 function stringifyHomeInventory(order, price) {
   var orderStringified = "";
 
@@ -213,7 +216,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   var price = 0;
   var customerId = "Forage_dummy";
 
-  var custEmail = 'reachforagers@gmail.com';
+  var custEmail = FORAGE_EMAIL;
 
   var orderId = request.params.orderId;
   var cardToken = request.params.cardToken;
@@ -267,6 +270,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     price = getHomeInventoryPrice(order);
     orderString = stringifyHomeInventory(order, price);
 
+    custEmail = order.get("homeEmail");
+
     if (savedCard) {
       // Charge the customer again, retrieve the customer ID!
       return Stripe.charges.create({
@@ -279,7 +284,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
           return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
         });
     } else {
-      custEmail = order.get("homeEmail");
+
       var custDesc = 'Customer for ' + custEmail;
       // Create a new Stripe customer!
       return Stripe.customers.create({
@@ -320,7 +325,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
       console.log("order save screwup \n");
 
       return Parse.Promise.error('A critical error has occurred with your order #' + orderId +
-                                 ' . Please contact reachforagers@gmail.com. ');
+                                 ' . Please contact ' + FORAGE_EMAIL + '.');
     });
 
   }).then(function(order) {
@@ -342,19 +347,19 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
     // Send the email.
     return Mailgun.messages().send({
-      from: 'reachforagers@gmail.com',
+      from: FORAGE_EMAIL,
       // to: home.get("email"),
-      to: custEmail, // order.get("email") hack - the mailgun sandbox only allows approved emails
-      cc: 'reachforagers@gmail.com',
-      bcc: 'reachorchardview@gmail.com',
-      subject: 'Your farmer\'s market order' + orderId + ' has been processed!',
+      to: FORAGE_EMAIL, // custEmail - temp hack - the mailgun sandbox only allows approved emails
+      // cc: FORAGE_EMAIL,
+      bcc: ORCHVIEW_EMAIL,
+      subject: 'Your farmer\'s market order' + orderId + ' is ready!',
       text: body
     }).then(null, function(error) {
 
       console.log("email send failure", error);
 
       return Parse.Promise.error('Your purchase was successful, but we were not able to ' +
-                                 'send you an email. Please contact us at reachforagers@gmail.com.');
+                                 'send you an email. Please contact us at ' + FORAGE_EMAIL + '.');
     });
 
   }).then(function() {
@@ -403,10 +408,10 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
 
   // Send the email.
   Mailgun.messages().send({
-    from: 'reachforagers@gmail.com',
+    from: FORAGE_EMAIL,
     //to: home.get("email"),
     to: userEmail, // hack - the mailgun sandbox only allows approved emails
-    cc: 'reachforagers@gmail.com',
+    cc: FORAGE_EMAIL,
     subject: 'Your Forage registration code!',
     text: body
   }).then(function() {
