@@ -215,7 +215,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   var order, orderString; 
   var price = 0;
   var customerId = "Forage_dummy";
-
   var custEmail = FORAGE_EMAIL;
 
   var orderId = request.params.orderId;
@@ -284,7 +283,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
           return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
         });
     } else {
-
       var custDesc = 'Customer for ' + custEmail;
       // Create a new Stripe customer!
       return Stripe.customers.create({
