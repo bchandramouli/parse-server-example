@@ -133,24 +133,21 @@ var ORCHVIEW_EMAIL = 'reachorchardview@gmail.com';
 function stringifyHomeInventory(order, price) {
   var orderStringified = "";
 
-  var orderPerFarms = order.get("orderFarms");
-  for (var i = 0 ; i < orderPerFarms.length; i++) {
-    var hInvList = orderPerFarms[i].get("homeInventories");
+  var hInvList = order.get("homeInventories");
     
-    for (var j = 0 ; j < hInvList.length; j++) {
-      var hInv = hInvList[j];
-      var fInv = hInv.get("farmInv");
+  for (var i = 0 ; i < hInvList.length; i++) {
+    var hInv = hInvList[i];
+    var fInv = hInv.get("farmInv");
 
-       orderStringified = orderStringified +
-        fInv.get("name") +
-        " * " +
-        hInv.get("homeCount").toString() +
-        " @ $" +
-        fInv.get("rate").toString() +
-        "/" +
-        fInv.get("unit") +
-        "\n\n";
-    }
+     orderStringified = orderStringified +
+      fInv.get("name") +
+      " * " +
+      hInv.get("homeCount").toString() +
+      " @ $" +
+      fInv.get("rate").toString() +
+      "/" +
+      fInv.get("unit") +
+      "\n\n";
   }
   orderStringified = orderStringified + "\n" + "Total Price: $" + price.toString() + "\n";
 
@@ -159,21 +156,21 @@ function stringifyHomeInventory(order, price) {
 
 function getHomeInventoryPrice(order) {
   var price = 0;
-  var orderPerFarms = order.get("orderFarms");
+  var hInvList = order.get("homeInventories");
 
-  for (var i = 0 ; i < orderPerFarms.length; i++) {
-    var hInvList = orderPerFarms[i].get("homeInventories");
+  for (var i = 0 ; i < hInvList.length; i++) {
+    var hInv = hInvList[i];
+    var fInv = hInv.get("farmInv");
 
-    for (var j = 0 ; j < hInvList.length; j++) {
-      var hInv = hInvList[j];
-      var fInv = hInv.get("farmInv");
-
-      price = price + fInv.get("rate") * hInv.get("homeCount");
-    }
+    price = price + fInv.get("rate") * hInv.get("homeCount");
   }
+  
   return price;
 }
 
+/*
+ * Example of parse promise array!
+ *
 function fetchCompleteOrder(order) {
   var promise_array = [];
   var orderPerFarms = order.get("orderFarms");
@@ -190,6 +187,7 @@ function fetchCompleteOrder(order) {
   
   return Parse.Promise.when(promise_array);
 }
+*/
 
 /**
  * Purchase an item from the Parse Store using the Stripe
@@ -231,9 +229,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     var orderQuery = new Parse.Query('Order');
     // Find the item to purchase.
     orderQuery.equalTo("objectId", orderId);
-    orderQuery.include("orderFarms");
-    orderQuery.include("orderFarms.homeInventories");
-    orderQuery.include("orderFarms.homeInventories.farmInv");
+    orderQuery.include("homeInventories");
+    orderQuery.include("homeInventories.farmInv");
 
     /**
      * Find the resuts. We handle the error here so our
@@ -255,16 +252,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     if (!result) {
       return Parse.Promise.error('Sorry, the order is no longer available.');
     }
-
     order = result;
-
-    return fetchCompleteOrder(order).then(function() {
-      return order;
-    }, function (error) {
-      console.log('Could not fetch all inventory ' + error);
-      return Parse.Promise.error('Could not fetch all the inventory');
-    });
-  }).then(function(order) {
 
     price = getHomeInventoryPrice(order);
     orderString = stringifyHomeInventory(order, price);
@@ -283,7 +271,9 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
           return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
         });
     } else {
+
       var custDesc = 'Customer for ' + custEmail;
+
       // Create a new Stripe customer!
       return Stripe.customers.create({
         source: cardToken,
@@ -362,6 +352,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
   }).then(function() {
 
+    console.log("sent email to id: ", customerId);
+
     // And we're done - send the customer Id back!
     response.success(customerId);
 
@@ -371,6 +363,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
      * message we individually crafted based on the failure above.
      */
   }, function(error) {
+
+    console.log("@error catchAll: ", error.toString());
 
     response.error(error);
   });
