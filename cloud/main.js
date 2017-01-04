@@ -194,10 +194,10 @@ function fetchCompleteOrder(order) {
  * Cloud Module.
  *
  *  Expected input (in request.params):
- *   homeId         : String, to retrieve the home details
- *   cardToken      : String, the credit card token returned to the client from Stripe
- *   savedCard      : Boolean, indicating a previously used card is being used
- *   customerId     : String, Stripe Opaque data, for a previously used card
+ *   orderId         : String, to retrieve the order details
+ *   savedCard      : Boolean, previous card => customerId, new card => cardToken
+ *      - customerId     : String, Stripe Opaque data, for a previously used card
+ *      - cardToken      : String, the credit card token returned to the client from Stripe
  *
  * Also, please note that on success, "Success" will be returned.
  */
@@ -213,13 +213,15 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   var order, orderString; 
   var price = 0;
   var customerId = "Forage_dummy";
+  var cardToken = "Forage_dummy";
   var custEmail = FORAGE_EMAIL;
 
   var orderId = request.params.orderId;
-  var cardToken = request.params.cardToken;
   var savedCard = request.params.savedCard;
   if (savedCard) {
     customerId = request.params.customerId;
+  } else {
+    cardToken = request.params.cardToken;
   }
 
   // We start in the context of a promise to keep all the
@@ -351,9 +353,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     });
 
   }).then(function() {
-
-    console.log("sent email to id: ", customerId);
-
     // And we're done - send the customer Id back!
     response.success(customerId);
 
@@ -369,7 +368,6 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     response.error(error);
   });
 });
-
 
 
 /**
