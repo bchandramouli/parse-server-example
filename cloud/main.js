@@ -1,127 +1,8 @@
-Parse.Cloud.define('hello', function(req, res) {
-  res.success('Hello world!');
-});
-
-Parse.Cloud.beforeSave('BeforeSaveFail', function(req, res) {
-  res.error('You shall not pass!');
-});
-
-Parse.Cloud.beforeSave('BeforeSaveFailWithPromise', function (req, res) {
-  var query = new Parse.Query('Yolo');
-  query.find().then(() => {
-   res.error('Nope');
-  }, () => {
-    res.success();
-  });
-});
-
-Parse.Cloud.beforeSave('BeforeSaveUnchanged', function(req, res) {
-  res.success();
-});
-
-Parse.Cloud.beforeSave('BeforeSaveChanged', function(req, res) {
-  req.object.set('foo', 'baz');
-  res.success();
-});
-
-Parse.Cloud.afterSave('AfterSaveTest', function(req) {
-  var obj = new Parse.Object('AfterSaveProof');
-  obj.set('proof', req.object.id);
-  obj.save();
-});
-
-Parse.Cloud.beforeDelete('BeforeDeleteFail', function(req, res) {
-  res.error('Nope');
-});
-
-Parse.Cloud.beforeSave('BeforeDeleteFailWithPromise', function (req, res) {
-  var query = new Parse.Query('Yolo');
-  query.find().then(() => {
-    res.error('Nope');
-  }, () => {
-    res.success();
-  });
-});
-
-Parse.Cloud.beforeDelete('BeforeDeleteTest', function(req, res) {
-  res.success();
-});
-
-Parse.Cloud.afterDelete('AfterDeleteTest', function(req) {
-  var obj = new Parse.Object('AfterDeleteProof');
-  obj.set('proof', req.object.id);
-  obj.save();
-});
-
-Parse.Cloud.beforeSave('SaveTriggerUser', function(req, res) {
-  if (req.user && req.user.id) {
-    res.success();
-  } else {
-    res.error('No user present on request object for beforeSave.');
-  }
-});
-
-Parse.Cloud.afterSave('SaveTriggerUser', function(req) {
-  if (!req.user || !req.user.id) {
-    console.log('No user present on request object for afterSave.');
-  }
-});
-
-Parse.Cloud.define('foo', function(req, res) {
-  res.success({
-    object: {
-      __type: 'Object',
-      className: 'Foo',
-      objectId: '123',
-      x: 2,
-      relation: {
-        __type: 'Object',
-        className: 'Bar',
-        objectId: '234',
-        x: 3
-      }
-    },
-    array: [{
-      __type: 'Object',
-      className: 'Bar',
-      objectId: '345',
-      x: 2
-    }],
-    a: 2
-  });
-});
-
-Parse.Cloud.define('bar', function(req, res) {
-  res.error('baz');
-});
-
-Parse.Cloud.define('requiredParameterCheck', function(req, res) {
-  res.success();
-}, function(params) {
-  return params.name;
-});
-
-Parse.Cloud.define('echoKeys', function(req, res){
-  return res.success({
-    applicationId: Parse.applicationId,
-    masterKey: Parse.masterKey,
-    javascriptKey: Parse.javascriptKey
-  });
-});
-
-Parse.Cloud.define('createBeforeSaveChangedObject', function(req, res){
-  var obj = new Parse.Object('BeforeSaveChanged');
-  obj.save().then(() => {
-    res.success(obj);
-  });
-});
-
 
 /**
  * From here...
  * New code added for inventory processing
  */
-
 // Initialize the Stripe and Mailgun Cloud Modules
 var Stripe = require('stripe')("sk_test_3n3xj9zbj6hOkEhngx7uITeH");
 var Mailgun = require('mailgun-js')({apiKey: "key-afab485a6a9bf921692f83c3c1d03b56",
@@ -256,6 +137,11 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     }
     order = result;
 
+    /**
+     *
+     *  Recompute the price!
+     *     - we cannot gaurantee the save could have happened in time. :( Safer to recompute!
+     */
     price = getHomeInventoryPrice(order);
     orderString = stringifyHomeInventory(order, price);
 
@@ -412,220 +298,321 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
   });
 });
 
-
 var Influx = require('influx');
-var influxDbUrl = 'http://ec2-54-88-255-188.compute-1.amazonaws.com:8086/${myDB}';
+var assert = require('assert');
+var influxDbUrl = 'http://ec2-54-210-219-155.compute-1.amazonaws.com:8086/${myDB}';
+var seriesName = 'sin';
 var myDB = 'test1';
-var orderDB = 'orderDB';
-var priceDB = 'priceDB';
+var orderPerItem = "orderPerItemSeries";
+var orderTotal = "orderTotalSeries";
 
-var invCostSeriesName = "invCost";
-var totalCostSeriesName = "totalCost";
-var invPriceSeriesName = "invPricing";
-
-var sinSeriesName = 'sin';
-
-var client = Influx({
+const client = new Influx.InfluxDB({
       // or single-host configuration
-      host : 'ec2-54-88-255-188.compute-1.amazonaws.com',
-      port : 8086, // optional, default 8086
-      protocol : 'http', // optional, default 'http'
-      username : 'root',
-      password : 'root',
-      database : myDB});
+      host : 'ec2-54-210-219-155.compute-1.amazonaws.com',
+      port: 8086,
+      database : myDB,
+      schema: [{
+          measurement: orderPerItem,
+          fields: {
+            price: Influx.FieldType.FLOAT,
+            qtyOrdered: Influx.FieldType.FLOAT,
+            available: Influx.FieldType.FLOAT
+          },
+          tags: [
+          'homeId','farmId','itemId', 'unit'
+          ]
+        }]
+      });
 
-/**
- * Log a time series entry in the InfluxDB.
- *
- *  Expected input (in request.params):
- *   value     : Value to be recorded
- *
- * Simple record value function - on success, "Success" will be returned.
- */
-Parse.Cloud.define('recordTSVal', function(request, response) {
+
+
+function writeToTotalSeries(homeEmail, totalPrice, checkOutTime) {
+/*
+ client.writePoint(orderTotalseries, point, {homeId: homeEmail}, {db: myDB},
+    function(err, resp) {
+      if (err) {
+        console.log("error writing order total to DB", err);
+        response.error(err);
+      } else {
+        response.success('Success writing order total');
+      }
+  });
+  */
+
+  client.writePoints([{
+    measurement: orderTotal,
+    tags: { homeId: homeEmail},
+    fields: {price: totalPrice},
+    timestamp: checkOutTime
+  }]);
+}
+
+function writeToItemSeries(homeEmail, farmName, itemName, itemQty, itemUnit, itemPrice, itemTotAvail, checkOutTime) {
+  client.writePoints([{
+    measurement: orderPerItem,
+    tags: { homeId: homeEmail, farmId: farmName, itemId: itemName, unit: itemUnit},
+    fields: { qtyOrdered: itemQty, price: itemPrice, available: itemTotAvail},
+    timestamp: checkOutTime
+  }]);
+}
+
+function logOrderInventories(order) {
+
+  var hInvList = order.get("homeInventories");
+  var homeEmail = order.get("homeEmail");
+  var cOutTime = order.get("checkoutTime");
+  timeinMS = new Date(cOutTime);
+
+  for (var i = 0 ; i < hInvList.length; i++) {
+    var hInv = hInvList[i];
+    var fInv = hInv.get("farmInv");
+
+    var farmName = fInv.get("farmName");
+    var itemName = fInv.get("name");
+    var itemQty = hInv.get("homeCount");
+    var itemPrice = fInv.get("rate");
+    var itemUnit = fInv.get("unit");
+    var itemTotAvail = fInv.get("totalAvailable");
+
+    writeToItemSeries(homeEmail, farmName, itemName, itemQty, itemUnit, itemPrice, itemTotAvail, timeinMS);
+  }
+
+  var total = order.get("checkoutPrice");
+  writeToTotalSeries(homeEmail, total, timeinMS);
+}
+
+Parse.Cloud.define('paidOrderPostForAnalytics', function(request, response) {
   // Top level variables used in the promise chain. Unlike callbacks,
   // each link in the chain of promise has a separate context.
-  var sinVal = request.params.val;
 
-  var point = {value: sinVal};
+  var orderId = request.params.orderId;
+
+  // First get the order
+  Parse.Promise.as().then(function() {
+
+    var orderQuery = new Parse.Query('Order');
+    // Find the item to purchase.
+    orderQuery.equalTo("objectId", orderId);
+    orderQuery.include("homeInventories");
+    orderQuery.include("homeInventories.farmInv");
+
+    /**
+     * Find the results. We handle the error here so our
+     * handlers don't conflict when the error propagates.
+     * Notice we do this for all asynchronous calls since we
+     * want to handle the error differently each time.
+     */
+    return orderQuery.first().then(null, function (error) {
+        console.log("could not find the order", error);
+        return Parse.Promise.error('DB query failed? - Order query failure.');
+    });
+
+  }).then(function(result) {
+    // Make sure we found an item.
+    if (!result) {
+      return Parse.Promise.error('Sorry, the order is no longer available.');
+    }
+    order = result;
+
+    logOrderInventories(order);
+
+    // And we're done - send the customer Id back!
+    response.success("Success!");
+
+    /**
+     * Any promise that throws an error will propagate to this handler.
+     * We use it to return the error from our Cloud Function using the
+     * message we individually crafted based on the failure above.
+     */
+  }, function(error) {
+
+    console.log("@error catchAll: ", error.toString());
+
+    response.error(error);
+  });
+});
+
+
+var farmItemSeries = "itemseries";
+Parse.Cloud.define('farmItempost', function(request, response) {
+  // Top level variables used in the promise chain. Unlike callbacks,
+  // each link in the chain of promise has a separate context.
+
+ // var itemDescp = request.params.itemDescp;
+ // var itemCategory = request.params.itemCategory;
+ // var itemTotal = request.params.itemTotal;
+ // var farmId = request.params.farmId;
+ // var itemUnits = request.params.itemUnits;
+
+  var itemName = request.params.itemName;
+  var itemPrice = request.params.itemPrice;
+  var farmName = request.params.farmName;
+  var point = {value: itemPrice, time : new Date()};
 
   /*
    * Not using promises 
    * writePoint is not a promise
    *     - could write code to wrap it in a promise but too much complexity
    */
-  client.writePoint(sinSeriesName, point, null, {db: myDB},
+ client.writePoint(farmItemSeries, point, {item: itemName, price: itemPrice, farm: farmName}, {db: myDB},
     function(err, resp) {
       if (err) {
-        console.log("error writing to DB", err);
+        console.log("error writing inevntory value to DB", err);
         response.error(err);
       } else {
-        response.success('Success');
+        response.success('Success writing inventory value');
       }
   });
 });
-
-/**
- * Log an order value in the InfluxDB.
- *
- *  Expected input (in request.params):
- *   cost         : cost for the order
- *   home_id      : home tag
- *   farm_id      : farm tag
- *   inventory_id : inventory tag
- *
- * Simple cost record function - on success, "Success" will be returned.
- */
-Parse.Cloud.define('recordInvCost', function(request, response) {
-  // Top level variables used in the promise chain. Unlike callbacks,
-  // each link in the chain of promise has a separate context.
-  
-  var cost = request.params.cost;
-  var homeId = request.params.homeId;
-  var farmId = request.params.farmId;
-  var invId = request.params.invId;
-  var point = {value: cost};
-
-  /*
-   * Not using promises 
-   * writePoint is not a promise
-   *     - could write code to wrap it in a promise but too much complexity
-   */
-  client.writePoint(invCostSeriesName,
-    point, 
-    {homeId : homeId, farmId: farmId, invId: invId},
-    {db: orderDB},
-    function(err, resp) {
-      if (err) {
-        console.log("error writing to DB", err);
-        response.error(err);
-      } else {
-        console.log(resp);
-        response.success('Success');
-      }
-  });
-});
-
-/**
- * Log total order value in the InfluxDB.
- *
- *  Expected input (in request.params):
- *   cost         : cost for the order
- *   home_id      : home tag
- *   farm_id      : farm tag
- *   inventory_id : inventory tag
- *
- * Simple cost record function - on success, "Success" will be returned.
- */
-Parse.Cloud.define('recordTotalCost', function(request, response) {
-  // Top level variables used in the promise chain. Unlike callbacks,
-  // each link in the chain of promise has a separate context.
-  
-  var cost = request.params.cost;
-  var homeId = request.params.homeId;
-  var farmId = request.params.farmId;
-  var point = {value: cost};
-
-  /*
-   * Not using promises 
-   * writePoint is not a promise
-   *     - could write code to wrap it in a promise but too much complexity
-   */
-  client.writePoint(totalCostSeriesName,
-    point, 
-    {homeId : homeId, farmId: farmId, invId: 'all'},
-    {db: orderDB},
-    function(err, resp) {
-      if (err) {
-        console.log("error writing to DB", err);
-        response.error(err);
-      } else {
-        response.success('Success');
-      }
-  });
-});
-
-/**
- * Log a pricing value in the InfluxDB.
- *
- *  Expected input (in request.params):
- *   price        : price of the inventory
- *   farm_id      : farm tag
- *   inventory_id : inventory tag
- *
- * Simple price record function - on success, "Success" will be returned.
- */
-Parse.Cloud.define('recordInvPrice', function(request, response) {
-  // Top level variables used in the promise chain. Unlike callbacks,
-  // each link in the chain of promise has a separate context.
-  
-  var price = request.params.price;
-  var farmId = request.params.farmId;
-  var invId = request.params.invId;
-  var point = {value: price};
-
-  /*
-   * Not using promises 
-   * writePoint is not a promise
-   *     - could write code to wrap it in a promise but too much complexity
-   */
-  client.writePoint(invPriceSeriesName,
-    point, 
-    {farmId: farmId, invId: invId},
-    {db: priceDB},
-    function(err, resp) {
-      if (err) {
-        console.log("error writing to DB", err);
-        response.error(err);
-      } else {
-        response.success('Success');
-      }
-  });
-});
-
 
 /**
  * Query the time series entries from the InfluxDB.
  *
  * Returns a set of data points in the last 1 hour
  */
-Parse.Cloud.define('queryTSVal', function(request, response) {
-  var query = 'SELECT * FROM ' + sinSeriesName + 
-    ' WHERE time > now() - 1h';
+Parse.Cloud.define('queryFarmItem', function(request, response) {
+  // Top level variables used in the promise chain. Unlike callbacks,
+  // each link in the chain of promise has a separate context.
+var itemname = request.params.itemName;
+var farmname = request.params.farmName;
 
-  client.query(query,
+//var query = "SELECT * FROM " + farmItemSeries + " WHERE time > now() - 24h";
+var query = "SELECT value FROM " + farmItemSeries + " WHERE item='"+ itemname + "' and farm='" + farmname + "'";
+
+  client.query(query, 
     function(err, resp) {
       if (err) {
-        console.log("error writing to DB", err);
+        console.log("error quering farm item in DB", err);
         response.error(err);
       } else {
+        assert(resp instanceof Array);
+        //console.log("response is", JSON.parse(resp));
         response.success(resp);
       }
   });
 });
-
 
 /**
- * Query the cost entries from the InfluxDB.
- *  Expected input (in request.params):
- *   farm_id      : farm tag
- *
- * Returns a set of data points in the last 1 hour
+ * Miscellaneous stuff
  */
-Parse.Cloud.define('queryInvCost', function(request, response) {
+Parse.Cloud.define('hello', function(req, res) {
+  res.success('Hello world!');
+});
 
-  var farmId = request.params.farmId;
+Parse.Cloud.beforeSave('BeforeSaveFail', function(req, res) {
+  res.error('You shall not pass!');
+});
 
-  var query = 'SELECT  FROM ' + invCostSeriesName +
-   '; SELECT AVG(VALUE) as avgvalue from' + invCostSeriesName + ' WHERE farmId = ' + farmId;
-
-  client.query(query,
-    function(err, resp) {
-      if (err) {
-        console.log("error writing to DB", err);
-        response.error(err);
-      } else {
-        response.success(resp);
-      }
+Parse.Cloud.beforeSave('BeforeSaveFailWithPromise', function (req, res) {
+  var query = new Parse.Query('Yolo');
+  query.find().then(() => {
+   res.error('Nope');
+  }, () => {
+    res.success();
   });
 });
+
+Parse.Cloud.beforeSave('BeforeSaveUnchanged', function(req, res) {
+  res.success();
+});
+
+Parse.Cloud.beforeSave('BeforeSaveChanged', function(req, res) {
+  req.object.set('foo', 'baz');
+  res.success();
+});
+
+Parse.Cloud.afterSave('AfterSaveTest', function(req) {
+  var obj = new Parse.Object('AfterSaveProof');
+  obj.set('proof', req.object.id);
+  obj.save();
+});
+
+Parse.Cloud.beforeDelete('BeforeDeleteFail', function(req, res) {
+  res.error('Nope');
+});
+
+Parse.Cloud.beforeSave('BeforeDeleteFailWithPromise', function (req, res) {
+  var query = new Parse.Query('Yolo');
+  query.find().then(() => {
+    res.error('Nope');
+  }, () => {
+    res.success();
+  });
+});
+
+Parse.Cloud.beforeDelete('BeforeDeleteTest', function(req, res) {
+  res.success();
+});
+
+Parse.Cloud.afterDelete('AfterDeleteTest', function(req) {
+  var obj = new Parse.Object('AfterDeleteProof');
+  obj.set('proof', req.object.id);
+  obj.save();
+});
+
+Parse.Cloud.beforeSave('SaveTriggerUser', function(req, res) {
+  if (req.user && req.user.id) {
+    res.success();
+  } else {
+    res.error('No user present on request object for beforeSave.');
+  }
+});
+
+Parse.Cloud.afterSave('SaveTriggerUser', function(req) {
+  if (!req.user || !req.user.id) {
+    console.log('No user present on request object for afterSave.');
+  }
+});
+
+Parse.Cloud.define('foo', function(req, res) {
+  res.success({
+    object: {
+      __type: 'Object',
+      className: 'Foo',
+      objectId: '123',
+      x: 2,
+      relation: {
+        __type: 'Object',
+        className: 'Bar',
+        objectId: '234',
+        x: 3
+      }
+    },
+    array: [{
+      __type: 'Object',
+      className: 'Bar',
+      objectId: '345',
+      x: 2
+    }],
+    a: 2
+  });
+});
+
+Parse.Cloud.define('bar', function(req, res) {
+  res.error('baz');
+});
+
+Parse.Cloud.define('requiredParameterCheck', function(req, res) {
+  res.success();
+}, function(params) {
+  return params.name;
+});
+
+Parse.Cloud.define('echoKeys', function(req, res){
+  return res.success({
+    applicationId: Parse.applicationId,
+    masterKey: Parse.masterKey,
+    javascriptKey: Parse.javascriptKey
+  });
+});
+
+Parse.Cloud.define('createBeforeSaveChangedObject', function(req, res){
+  var obj = new Parse.Object('BeforeSaveChanged');
+  obj.save().then(() => {
+    res.success(obj);
+  });
+});
+
+
+
+
