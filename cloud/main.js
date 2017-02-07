@@ -1,4 +1,3 @@
-
 /**
  * From here...
  * New code added for inventory processing
@@ -298,14 +297,12 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
   });
 });
 
+
 var Influx = require('influx');
 var assert = require('assert');
-var influxDbUrl = 'http://ec2-54-210-219-155.compute-1.amazonaws.com:8086/${myDB}';
-var seriesName = 'sin';
-var myDB = 'test1';
-var orderPerItem = "orderPerItemSeries";
-var orderTotal = "orderTotalSeries";
 
+// ************************* Test Analytics DB ***************************
+var myDB = 'test1';
 const client = new Influx.InfluxDB({
       // or single-host configuration
       host : 'ec2-54-210-219-155.compute-1.amazonaws.com',
@@ -324,7 +321,198 @@ const client = new Influx.InfluxDB({
         }]
       });
 
+// ************************* Production Analytics ***************************
+var analyticsDB = 'analytics';
+var orderPerItem = "orderPerItemSeries";
+var orderTotal = "orderTotalSeries";
+var newFarmItemSeries = "farmitemseries";
+var homeOrderSeries = "homeorderseries";
+var userEventSeries = "usereventseries";
+var screenEeventSeries = "screeneventseries";
 
+const clientAnalytics = new Influx.InfluxDB({
+      // or single-host configuration
+      host : 'ec2-54-210-219-155.compute-1.amazonaws.com',
+      //host : 'localhost',
+      port: 8086,
+      database : analyticsDB,
+      schema: [{
+          measurement: newFarmItemSeries,
+          fields: {
+            price: Influx.FieldType.FLOAT,
+            available: Influx.FieldType.FLOAT
+          },
+          tags: [
+          'farmId','itemId', 'unit'
+          ]
+        },
+        {
+          measurement: userEventSeries,
+          fields: {
+            value: Influx.FieldType.FLOAT,
+          },
+          tags: [
+          'userType', 'userName', 'userId', 'userEvent'
+          ]
+        },
+        {
+          measurement: screenEeventSeries,
+          fields: {
+            value: Influx.FieldType.FLOAT,
+          },
+          tags: [
+          'screenName', 'userType', 'userName', 'userId'
+          ]
+        }
+        ]
+      });
+
+function timeSeriesWriteScreenEvent(series, fieldList, tagList, timeinMS) {
+  if (tagList === null) {
+    return;
+  }
+  var screen = tagList.screen;
+  var utype = tagList.userType;
+  var uname = tagList.userName;
+  var uid =   tagList.userId;
+
+
+  clientAnalytics.writePoints([{
+    measurement: series,
+    tags: { screenName: screen, userType: utype, userName: uname, userId: uid },
+    fields: { value: 1},
+    timestamp: timeinMS
+  }]).then(() => {
+      //console.info('Screen Event Write success');
+    }).catch(err => {
+      console.error("Screen Event Write error: ",err);
+  });
+}
+
+function timeSeriesWriteUserEvent(series, fieldList, tagList, timeinMS) {
+  if (tagList === null) {
+    return;
+  }
+  var utype = tagList.userType;
+  var uname = tagList.userName;
+  var uid =   tagList.userId;
+  var uevent = tagList.event;
+
+  clientAnalytics.writePoints([{
+    measurement: series,
+    tags: { userType: utype, userName: uname, userId: uid, userEvent: uevent},
+    fields: { value: 1},
+    timestamp: timeinMS
+  }]).then(() => {
+      //console.info('User Event Write success');
+    }).catch(err => {
+      console.error("User Event Write error: ",err);
+  });
+}
+
+function timeSeriesWriteHomeOrder(series, fieldList, tagList, timeinMS) {
+  if (fieldList === null) {
+    return;
+  }
+  
+  var orderId = fieldList.orderId;
+  // First get the order
+  Parse.Promise.as().then(function() {
+
+    var orderQuery = new Parse.Query('Order');
+    // Find the item to purchase.
+    orderQuery.equalTo("objectId", orderId);
+    orderQuery.include("homeInventories");
+    orderQuery.include("homeInventories.farmInv");
+
+    /**
+     * Find the results. We handle the error here so our
+     * handlers don't conflict when the error propagates.
+     * Notice we do this for all asynchronous calls since we
+     * want to handle the error differently each time.
+     */
+    return orderQuery.first().then(null, function (error) {
+        console.log("could not find the order", error);
+        return Parse.Promise.error('DB query failed? - Order query failure for analytics.');
+    });
+
+  }).then(function(result) {
+    // Make sure we found an item.
+    if (!result) {
+      return Parse.Promise.error('Order is no longer available for analytics.');
+    }
+    order = result;
+    logOrderInventories(order);
+
+    // And we're done
+    /**
+     * Any promise that throws an error will propagate to this handler.
+     * We use it to return the error from our Cloud Function using the
+     * message we individually crafted based on the failure above.
+     */
+  }, function(error) {
+    console.log("Order Analytics event @error catchAll: ", error.toString());
+  });
+}
+
+function timeSeriesWriteFarmItem(series, fieldList, tagList, timeinMS) {
+  if (fieldList === null) {
+    return;
+  }
+  if (tagList === null) {
+    return;
+  }
+  var itemName = tagList.itemName;
+  var farmName = tagList.farmName;
+  var itemUnit = tagList.itemUnit;
+  var itemPrice = fieldList.itemPrice;
+  var itemTotAvail = fieldList.itemTotAvail;
+
+  clientAnalytics.writePoints([{
+    measurement: series,
+    tags: { farmId: farmName, itemId: itemName, unit: itemUnit},
+    fields: { price: itemPrice, available: itemTotAvail},
+    timestamp: timeinMS
+  }]).then(() => {
+      //console.info('Farm Item Update Event Write success');
+    }).catch(err => {
+      console.error("Farm Item Update Event Write error: ",err);
+  });
+}
+
+Parse.Cloud.define('trackingEventPost', function(request, response) {
+  var type   = request.params.type;
+  var series = request.params.series;
+  var fieldList = request.params.fields;
+  var tagList = request.params.tags;
+  var timeinMS = request.params.eventTimeStamp;
+  var metricLines = request.params.lines;
+
+  //console.error("Analytics Tracking Event received. Type:  ", type.toString(), " series: ", series.toString());
+
+  if (type.toString() === 'timeseries') {
+    // Write the Farm Item Series point
+    if (series.toString() === newFarmItemSeries) {
+      timeSeriesWriteFarmItem(series, fieldList, tagList, timeinMS);
+    }
+    // Write the User Event Series point
+    if (series.toString() === userEventSeries) {
+      timeSeriesWriteUserEvent(series, fieldList, tagList, timeinMS);
+    }
+    // Write the Screen Event Series point
+    if (series.toString() === screenEeventSeries) {
+      timeSeriesWriteScreenEvent(series, fieldList, tagList, timeinMS);
+    }
+    // Write the Home Order Series point
+    if (series.toString() === homeOrderSeries) {
+      timeSeriesWriteHomeOrder(series, fieldList, tagList, timeinMS);
+    }
+  }
+
+  //console.log("Success writing app event to analytics DB");
+  response.success('Success writing app event to analytics DB');
+
+});
 
 function writeToTotalSeries(homeEmail, totalPrice, checkOutTime) {
 /*
@@ -339,7 +527,7 @@ function writeToTotalSeries(homeEmail, totalPrice, checkOutTime) {
   });
   */
 
-  client.writePoints([{
+  clientAnalytics.writePoints([{
     measurement: orderTotal,
     tags: { homeId: homeEmail},
     fields: {price: totalPrice},
@@ -348,7 +536,7 @@ function writeToTotalSeries(homeEmail, totalPrice, checkOutTime) {
 }
 
 function writeToItemSeries(homeEmail, farmName, itemName, itemQty, itemUnit, itemPrice, itemTotAvail, checkOutTime) {
-  client.writePoints([{
+  clientAnalytics.writePoints([{
     measurement: orderPerItem,
     tags: { homeId: homeEmail, farmId: farmName, itemId: itemName, unit: itemUnit},
     fields: { qtyOrdered: itemQty, price: itemPrice, available: itemTotAvail},
@@ -380,58 +568,6 @@ function logOrderInventories(order) {
   var total = order.get("checkoutPrice");
   writeToTotalSeries(homeEmail, total, timeinMS);
 }
-
-Parse.Cloud.define('paidOrderPostForAnalytics', function(request, response) {
-  // Top level variables used in the promise chain. Unlike callbacks,
-  // each link in the chain of promise has a separate context.
-
-  var orderId = request.params.orderId;
-
-  // First get the order
-  Parse.Promise.as().then(function() {
-
-    var orderQuery = new Parse.Query('Order');
-    // Find the item to purchase.
-    orderQuery.equalTo("objectId", orderId);
-    orderQuery.include("homeInventories");
-    orderQuery.include("homeInventories.farmInv");
-
-    /**
-     * Find the results. We handle the error here so our
-     * handlers don't conflict when the error propagates.
-     * Notice we do this for all asynchronous calls since we
-     * want to handle the error differently each time.
-     */
-    return orderQuery.first().then(null, function (error) {
-        console.log("could not find the order", error);
-        return Parse.Promise.error('DB query failed? - Order query failure.');
-    });
-
-  }).then(function(result) {
-    // Make sure we found an item.
-    if (!result) {
-      return Parse.Promise.error('Sorry, the order is no longer available.');
-    }
-    order = result;
-
-    logOrderInventories(order);
-
-    // And we're done - send the customer Id back!
-    response.success("Success!");
-
-    /**
-     * Any promise that throws an error will propagate to this handler.
-     * We use it to return the error from our Cloud Function using the
-     * message we individually crafted based on the failure above.
-     */
-  }, function(error) {
-
-    console.log("@error catchAll: ", error.toString());
-
-    response.error(error);
-  });
-});
-
 
 var farmItemSeries = "itemseries";
 Parse.Cloud.define('farmItempost', function(request, response) {
