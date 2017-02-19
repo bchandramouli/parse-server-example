@@ -9,6 +9,7 @@ var Mailgun = require('mailgun-js')({apiKey: "key-afab485a6a9bf921692f83c3c1d03b
 
 var FORAGE_EMAIL = 'reachforagers@gmail.com';
 var ORCHVIEW_EMAIL = 'reachorchardview@gmail.com';
+var FORAGE_DUMMY_ID = "FORAGE_DUMMY_ID";
 
 function stringifyHomeInventory(order, price) {
   var orderStringified = "";
@@ -91,15 +92,19 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   // each link in the chain of promise has a separate context.
   var order, orderString; 
   var price = 0;
-  var cardToken = "Forage_dummy";
+  var cardToken = FORAGE_DUMMY_ID;
   var custEmail = FORAGE_EMAIL;
 
   var orderId = request.params.orderId;
   var newCard = request.params.newCard;
   var customerId = request.params.customerId;
+  var cardId = FORAGE_DUMMY_ID;
 
   if (newCard) {
     cardToken = request.params.cardToken;
+    // For new card the card ID will be generated and sent back to the app!
+  } else {
+    cardId = request.params.cardId;
   }
 
   // We start in the context of a promise to keep all the
@@ -145,22 +150,30 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     custEmail = order.get("homeEmail");
 
     if (newCard) {
-      return Stripe.charges.create({
+      return Stripe.customers.createSource(customerId,
+        { source: cardToken}
+      ).then(function(card) {
+        // Save the card ID as the source card info
+        cardId = card.id;
+
+        return Stripe.charges.create({
           amount: price * 100, // express dollars in cents
           currency: "usd",
           customer: customerId,
-          source: cardToken,
+          source: cardId,
           metadata: {'order_id': orderId} // Save orderId, to correlate all orders for a user
           }).then(null, function(error) {
             console.log('Charging with stripe failed. Error: ' + error);
             return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
           });
+        });
     } else {
-      // Charge the customer again, retrieve the customer ID!
+      // Charge the customer!
       return Stripe.charges.create({
           amount: price * 100, // express dollars in cents
           currency: "usd",
           customer: customerId, // Previously stored, then retrieved
+          source: cardId, // Set source so we are not just using default card!
           metadata: {'order_id': orderId} // Save orderId, to correlate all orders for a user
         }).then(null, function(error) {
           console.log('Charging with stripe failed. Error: ' + error);
@@ -173,6 +186,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     // Credit card charged! Now we save the ID of the purchase on our
     // order and mark it as 'charged'.
     order.set('customerId', customerId);
+    order.set('stripeCardId', cardId);
     order.set('stripePaymentId', purchase.id);
     order.set('charged', true);
 
@@ -225,8 +239,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     });
 
   }).then(function() {
-    // And we're done - send the customer Id back!
-    response.success(customerId);
+    // And we're done - send the card Id back!
+    response.success(cardId);
 
     /**
      * Any promise that throws an error will propagate to this handler.
