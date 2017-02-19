@@ -74,10 +74,9 @@ function fetchCompleteOrder(order) {
  * Cloud Module.
  *
  *  Expected input (in request.params):
- *   orderId         : String, to retrieve the order details
- *   savedCard      : Boolean, previous card => customerId, new card => cardToken
- *      - customerId     : String, Stripe Opaque data, for a previously used card
- *      - cardToken      : String, the credit card token returned to the client from Stripe
+ *   orderId      : String, to retrieve the order details
+ *   newCard      : Boolean, new card => cardToken
+ *      - cardToken      : String, the credit card token returned to the client by Stripe
  *
  * Also, please note that on success, "Success" will be returned.
  */
@@ -92,15 +91,14 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
   // each link in the chain of promise has a separate context.
   var order, orderString; 
   var price = 0;
-  var customerId = "Forage_dummy";
   var cardToken = "Forage_dummy";
   var custEmail = FORAGE_EMAIL;
 
   var orderId = request.params.orderId;
-  var savedCard = request.params.savedCard;
-  if (savedCard) {
-    customerId = request.params.customerId;
-  } else {
+  var newCard = request.params.newCard;
+  var customerId = request.params.customerId;
+
+  if (newCard) {
     cardToken = request.params.cardToken;
   }
 
@@ -146,7 +144,18 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
 
     custEmail = order.get("homeEmail");
 
-    if (savedCard) {
+    if (newCard) {
+      return Stripe.charges.create({
+          amount: price * 100, // express dollars in cents
+          currency: "usd",
+          customer: customerId,
+          source: cardToken,
+          metadata: {'order_id': orderId} // Save orderId, to correlate all orders for a user
+          }).then(null, function(error) {
+            console.log('Charging with stripe failed. Error: ' + error);
+            return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
+          });
+    } else {
       // Charge the customer again, retrieve the customer ID!
       return Stripe.charges.create({
           amount: price * 100, // express dollars in cents
@@ -157,30 +166,8 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
           console.log('Charging with stripe failed. Error: ' + error);
           return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
         });
-    } else {
-
-      var custDesc = 'Customer for ' + custEmail;
-
-      // Create a new Stripe customer!
-      return Stripe.customers.create({
-        source: cardToken,
-        description: custDesc,
-        email: custEmail // Save the customer's email
-      }).then(function(customer) {
-        // Save the Id!
-        customerId = customer.id;
-
-        return Stripe.charges.create({
-          amount: price * 100, // express dollars in cents
-          currency: "usd",
-          customer: customerId,
-          metadata: {'order_id': orderId} // Save orderId, to correlate all orders for a user
-          }).then(null, function(error) {
-            console.log('Charging with stripe failed. Error: ' + error);
-            return Parse.Promise.error('An error has occurred. Your credit card was not charged.');
-          });
-        });
     }
+
   }).then(function(purchase) {
 
     // Credit card charged! Now we save the ID of the purchase on our
@@ -295,6 +282,36 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
     console.log("email send failure", error);
     response.error(error);
   });
+});
+
+
+/**
+ * Create a stripe customer for this home user!
+ *
+ *  Expected input (in request.params):
+ *   email     : User's email
+ *   homeId    : Associate the homeId as meta data on the customer!
+ *  
+ * We create a customer without a credit card (source) here!
+ */
+Parse.Cloud.define('customer', function(request, response) {
+
+  var userEmail = request.params.userEmail;
+  var homeId = request.params.homeId;
+
+  var custDesc = 'Customer for ' + homeId;
+
+  // Create a new Stripe customer!
+  return Stripe.customers.create({
+        description: custDesc, // Add the homeId as meta data
+        email: userEmail // Save the user's email
+      }).then(function(customer) {
+        // Save the Id!
+        customerId = customer.id;
+        response.success(customerId);
+      }, function(error) {
+        response.error(error);
+      });
 });
 
 
