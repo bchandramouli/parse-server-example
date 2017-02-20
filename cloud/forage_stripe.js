@@ -1,4 +1,3 @@
-
 var Stripe = require('stripe')("sk_test_3n3xj9zbj6hOkEhngx7uITeH");
 
 module.exports = function(app) {
@@ -12,14 +11,13 @@ module.exports = function(app) {
  */
 app.get('/stripe/customer', function(request, response) {
   var customerId = 'cus_A9H3lpT4fOK3ep'; // Get it from the request!
-
   Stripe.customers.retrieve(customerId, function(err, customer) {
     if (err) {
       response.status(402).send('Error retrieving customer.');
     } else {
       response.json(customer);
     }
-  })
+  });
 });
 
 /* Stripe endpoint 2 */
@@ -51,4 +49,4 @@ app.get('/stripe/customer/default_source', function(request, response) {
     }
   });
 });
-}
+};
