@@ -308,7 +308,7 @@ Parse.Cloud.define('verifyEmail', function(request, response) {
  *  
  * We create a customer without a credit card (source) here!
  */
-Parse.Cloud.define('customer', function(request, response) {
+Parse.Cloud.define('createStripeCustomer', function(request, response) {
 
   var userEmail = request.params.userEmail;
   var homeId = request.params.homeId;
@@ -326,6 +326,59 @@ Parse.Cloud.define('customer', function(request, response) {
       }, function(error) {
         response.error(error);
       });
+});
+
+/**
+ * Endpoints and routes for Stripe pre-built UI in iOS to access. 
+ *
+ *  Expected input (in request.params):
+ *   customerId : the stripe customer Id, duh!
+ *  
+ */
+Parse.Cloud.define('customer', function(request, response) {
+  var customerId = 'cus_A9H3lpT4fOK3ep'; // Is this right? XXX - Mouli?
+  console.log("customer function");
+  Stripe.customers.retrieve(customerId, function(err, customer) {
+    if (err) {
+      response.status(402).error('Error retrieving customer.');
+    } else {
+      response.success(customer);
+    }
+  })
+});
+
+/* Stripe endpoint 2 */
+Parse.Cloud.define('/customer/sources', function(request, response) {
+  var customerId = 'cus_A9H3lpT4fOK3ep'; // Load the Stripe Customer ID for your logged in user
+
+  console.log("customer sources endpoint");
+
+  Stripe.customers.createSource(customerId, {
+    source: request.body.source
+  }, function(err, source) {
+    if (err) {
+      response.status(402).error('Error attaching source.');
+    } else {
+      response.status(200).end();
+    }
+  });
+});
+
+/* Stripe endpoint 3 */
+Parse.Cloud.define('/customer/default_source', function(request, response) {
+  var customerId = 'cus_A9H3lpT4fOK3ep'; // Load the Stripe Customer ID for your logged in user
+
+  console.log("default source endpoint");
+
+  Stripe.customers.update(customerId, {
+    default_source: request.body.defaultSource
+  }, function(err, customer) {
+    if (err) {
+      response.status(402).error('Error setting default source.');
+    } else {
+      response.status(200).end();
+    }
+  });
 });
 
 

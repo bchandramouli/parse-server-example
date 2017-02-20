@@ -2,8 +2,13 @@
 // compatible API routes.
 
 var express = require('express');
-var ParseServer = require('parse-server').ParseServer;
+var app = express();
 var path = require('path');
+
+var ParseServer = require('parse-server').ParseServer;
+
+// Custom Forage file for Stripe!
+var ForageStripe = require('./cloud/forage_stripe')(app);
 
 // load the environment variables
 var dotenv = require('dotenv').config();
@@ -28,7 +33,6 @@ var api = new ParseServer({
 // If you wish you require them, you can set them as options in the initialization above:
 // javascriptKey, restAPIKey, dotNetKey, clientKey
 
-var app = express();
 
 // Serve static assets from the /public folder
 app.use('/public', express.static(path.join(__dirname, '/public')));
