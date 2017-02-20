@@ -11,15 +11,13 @@ module.exports = function(app) {
  *  
  */
 app.get('/stripe/customer', function(request, response) {
-  console.log('request is', request);
   var customerId = 'cus_A9H3lpT4fOK3ep'; // Get it from the request!
-  console.log("customer function");
+
   Stripe.customers.retrieve(customerId, function(err, customer) {
     if (err) {
       response.status(402).send('Error retrieving customer.');
     } else {
       response.json(customer);
-      console.log('response is', response);
     }
   })
 });
@@ -27,8 +25,6 @@ app.get('/stripe/customer', function(request, response) {
 /* Stripe endpoint 2 */
 app.get('/stripe/customer/sources', function(request, response) {
   var customerId = 'cus_A9H3lpT4fOK3ep'; // Load the Stripe Customer ID for your logged in user
-
-  console.log("customer sources endpoint");
 
   Stripe.customers.createSource(customerId, {
     source: request.body.source
@@ -44,8 +40,6 @@ app.get('/stripe/customer/sources', function(request, response) {
 /* Stripe endpoint 3 */
 app.get('/stripe/customer/default_source', function(request, response) {
   var customerId = 'cus_A9H3lpT4fOK3ep'; // Load the Stripe Customer ID for your logged in user
-
-  console.log("default source endpoint");
 
   Stripe.customers.update(customerId, {
     default_source: request.body.defaultSource

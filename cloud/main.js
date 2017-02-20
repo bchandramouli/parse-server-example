@@ -328,60 +328,6 @@ Parse.Cloud.define('createStripeCustomer', function(request, response) {
       });
 });
 
-/**
- * Endpoints and routes for Stripe pre-built UI in iOS to access. 
- *
- *  Expected input (in request.params):
- *   customerId : the stripe customer Id, duh!
- *  
- */
-Parse.Cloud.define('customer', function(request, response) {
-  var customerId = 'cus_A9H3lpT4fOK3ep'; // Is this right? XXX - Mouli?
-  console.log("customer function");
-  Stripe.customers.retrieve(customerId, function(err, customer) {
-    if (err) {
-      response.status(402).error('Error retrieving customer.');
-    } else {
-      response.success(customer);
-    }
-  })
-});
-
-/* Stripe endpoint 2 */
-Parse.Cloud.define('/customer/sources', function(request, response) {
-  var customerId = 'cus_A9H3lpT4fOK3ep'; // Load the Stripe Customer ID for your logged in user
-
-  console.log("customer sources endpoint");
-
-  Stripe.customers.createSource(customerId, {
-    source: request.body.source
-  }, function(err, source) {
-    if (err) {
-      response.status(402).error('Error attaching source.');
-    } else {
-      response.status(200).end();
-    }
-  });
-});
-
-/* Stripe endpoint 3 */
-Parse.Cloud.define('/customer/default_source', function(request, response) {
-  var customerId = 'cus_A9H3lpT4fOK3ep'; // Load the Stripe Customer ID for your logged in user
-
-  console.log("default source endpoint");
-
-  Stripe.customers.update(customerId, {
-    default_source: request.body.defaultSource
-  }, function(err, customer) {
-    if (err) {
-      response.status(402).error('Error setting default source.');
-    } else {
-      response.status(200).end();
-    }
-  });
-});
-
-
 var Influx = require('influx');
 var assert = require('assert');
 
