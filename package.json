@@ -17,7 +17,7 @@
     "kerberos": "~0.0.x",
     "mailgun-js": "~0.7.10",
     "parse": "~1.8.0",
-    "parse-server": "~2.2.14",
+    "parse-server": "2.2.14",
     "stripe": "~4.5.0"
   },
   "scripts": {
