@@ -17,6 +17,7 @@ if (!databaseUri) {
 }
 
 var api = new ParseServer({
+  logLevel: 'error', // use info for debugging
   databaseURI: databaseUri || 'mongodb://foo:blah@ds061325.mlab.com:61325/farmview', // 'mongodb://localhost:27017/dev',
   cloud: process.env.CLOUD_CODE_MAIN || __dirname + '/cloud/main.js',
   appId: process.env.APP_ID || 'bgVXRUCTrWhVpT3Ztrl2McZisxr1KZ4INFqLrI8X',
