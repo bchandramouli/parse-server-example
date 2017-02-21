@@ -7,9 +7,6 @@ var path = require('path');
 
 var ParseServer = require('parse-server').ParseServer;
 
-// Custom Forage file for Stripe!
-var ForageStripe = require('./cloud/forage_stripe')(app);
-
 // load the environment variables
 var dotenv = require('dotenv').config();
 
