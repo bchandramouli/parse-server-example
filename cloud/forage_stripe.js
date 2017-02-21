@@ -60,7 +60,6 @@ Parse.Cloud.define('setStripeCustomerSource', function(request, response) {
 
   var customerId = request.params.customerId;
   var cardId = request.params.cardId;
-  // var customerId = 'cus_A9H3T2fXOPJykp';
 
   Stripe.customers.createSource(customerId, {
     source: cardId
@@ -78,7 +77,6 @@ Parse.Cloud.define('setStripeCustomerSource', function(request, response) {
 Parse.Cloud.define('updateStripeCustomerDefaultSource', function(request, response) {
   var customerId = request.params.customerId;
   var cardToken = request.params.cardToken;
-  // var customerId = 'cus_A9H3T2fXOPJykp';
 
   Stripe.customers.update(customerId, {
     default_source: cardToken
