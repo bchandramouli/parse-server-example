@@ -13,6 +13,57 @@ var FORAGE_DUMMY_ID = "FORAGE_DUMMY_ID";
 var SUCCESS_STR = 'Success';
 var STRIPE_ERR_MOD = "STRIPE_ERR: ";
 
+var FarmOrder = Parse.Object.extend("FarmOrder");
+
+// Wrap as the Parse class function??? 
+function createFarmOrder(farmId, order, ordList) {
+  var fOrder = new FarmOrder();
+  fOrder.set('farmId', farmId);
+  fOrder.set('orderId', order.get('objectId'));
+  fOrder.set('order', order); // a back pointer!
+  fOrder.set('homeInventories', ordList);
+  return fOrder;
+}
+
+// Create Farm suborders from Order
+function parseAndSetupFarmOrders(order) {
+  var fOrderArr = new Array();
+  var ordList = new Array();
+  var farmId = "";
+  var fOrder;
+
+  var hInvList = order.get('homeInventories');
+
+  // Setup the first Id
+  farmId = hInvList[0].get('farmId');
+    
+  for (var i = 0 ; i < hInvList.length; i++) {
+    var hInv = hInvList[i];
+    //var fInv = hInv.get("farmInv");
+
+    var hInvFarmId = hInv.get('farmId');
+    if (hInvFarmId !== farmId) {
+        // Pack and save the previous order list!
+        fOrder = createFarmOrder(farmId, order, ordList);
+        fOrderArr.push(fOrder);
+
+        /* Setup for the next Farm! */
+        farmId = hInvFarmId;
+        ordList = new Array();
+    }
+    ordList.push(hInv);
+  }
+
+  if (ordList.length > 0) {
+    // Save the last batch!
+    fOrder = createFarmOrder(farmId, order, ordList);
+    fOrderArr.push(fOrder);
+  }
+
+  return fOrderArr;
+}
+
+
 function stringifyHomeInventory(order, price) {
   var orderStringified = "";
 
@@ -20,16 +71,16 @@ function stringifyHomeInventory(order, price) {
     
   for (var i = 0 ; i < hInvList.length; i++) {
     var hInv = hInvList[i];
-    var fInv = hInv.get("farmInv");
+    //var fInv = hInv.get("farmInv");
 
      orderStringified = orderStringified +
-      fInv.get("name") +
+      hInv.get("name") +
       " * " +
       hInv.get("homeCount").toString() +
       " @ $" +
-      fInv.get("rate").toString() +
+      hInv.get("rate").toString() +
       "/" +
-      fInv.get("unit") +
+      hInv.get("unit") +
       "\n\n";
   }
   orderStringified = orderStringified + "\n" + "Total Price: $" + price.toString() + "\n";
@@ -43,9 +94,9 @@ function getHomeInventoryPrice(order) {
 
   for (var i = 0 ; i < hInvList.length; i++) {
     var hInv = hInvList[i];
-    var fInv = hInv.get("farmInv");
+    //var fInv = hInv.get("farmInv");
 
-    price = price + fInv.get("rate") * hInv.get("homeCount");
+    price = price + hInv.get("rate") * hInv.get("homeCount");
   }
   
   return price;
@@ -200,7 +251,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     // Save updated order
     return order.save().then(null, function(error) {
       /**
-       * This is the worst place to fail since the card was charged but the order's
+       * From here are the worst places to fail since the card was charged but the order's
        * 'charged' field was not set. Here we need the user to contact us and give us
        * details of their credit card (last 4 digits) and we can then find the payment
        * on Stripe's dashboard to confirm which order to rectify.
@@ -210,9 +261,21 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
       return Parse.Promise.error('A critical error has occurred with your order #' + orderId +
                                  ' . Please contact ' + FORAGE_EMAIL + '.');
     });
+  }).then(function(savedOrder) {
+    // Store the global order variable as the saved value for the email function next!
+    order = savedOrder;
 
-  }).then(function(order) {
+    // Email sent to user - create farm order objects before responding to user!
+    var ordList = parseAndSetupFarmOrders(order)
+    return Parse.Object.saveAll(ordList).then(null, function(error) {
+      console.log("farm order sorting failure", error);
 
+      return Parse.Promise.error('Your purchase was successful, but we are not able to ' +
+                                 'fulfill your order. Please contact us at ' + FORAGE_EMAIL + '.' +
+                                 ' We will fix this ASAP!');
+    });
+
+  }).then(function(farmOrder) {
     // Credit card charged and order item updated properly!
     // We're done, so let's send an email to the user.
 

@@ -258,8 +258,8 @@ function logOrderInventories(order) {
     var farmName = fInv.get("farmName");
     var itemName = fInv.get("name");
     var itemQty = hInv.get("homeCount");
-    var itemPrice = fInv.get("rate");
-    var itemUnit = fInv.get("unit");
+    var itemPrice = hInv.get("rate");
+    var itemUnit = hInv.get("unit");
     var itemTotAvail = fInv.get("totalAvailable");
 
     writeToItemSeries(homeEmail, farmName, itemName, itemQty, itemUnit, itemPrice, itemTotAvail, timeinMS);
