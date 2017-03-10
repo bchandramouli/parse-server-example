@@ -15,7 +15,7 @@ var STRIPE_ERR_MOD = "STRIPE_ERR: ";
 
 var FarmOrder = Parse.Object.extend("FarmOrder");
 
-// Wrap as the Parse class function??? 
+// Wrap as the Parse class function???
 function createFarmOrder(farmId, order, ordList) {
   var fOrder = new FarmOrder();
   fOrder.set('farmId', farmId);
@@ -27,8 +27,8 @@ function createFarmOrder(farmId, order, ordList) {
 
 // Create Farm suborders from Order
 function parseAndSetupFarmOrders(order) {
-  var fOrderArr = new Array();
-  var ordList = new Array();
+  var fOrderArr = [];
+  var ordList = [];
   var farmId = "";
   var fOrder;
 
@@ -49,7 +49,7 @@ function parseAndSetupFarmOrders(order) {
 
         /* Setup for the next Farm! */
         farmId = hInvFarmId;
-        ordList = new Array();
+        ordList = [];
     }
     ordList.push(hInv);
   }
@@ -266,7 +266,7 @@ Parse.Cloud.define('purchaseInventory', function(request, response) {
     order = savedOrder;
 
     // Email sent to user - create farm order objects before responding to user!
-    var ordList = parseAndSetupFarmOrders(order)
+    var ordList = parseAndSetupFarmOrders(order);
     return Parse.Object.saveAll(ordList).then(null, function(error) {
       console.log("farm order sorting failure", error);
 
