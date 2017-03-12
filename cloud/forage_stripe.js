@@ -19,8 +19,8 @@ var FarmOrder = Parse.Object.extend("FarmOrder");
 function createFarmOrder(farmId, order, ordList) {
   var fOrder = new FarmOrder();
   fOrder.set('farmId', farmId);
-  fOrder.set('orderId', order.get('objectId'));
-  fOrder.set('order', order); // a back pointer!
+  fOrder.set('userOrderId', order.id);
+  fOrder.set('userOrder', order); // a back pointer!
   fOrder.set('homeInventories', ordList);
   return fOrder;
 }
