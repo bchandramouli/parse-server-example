@@ -5,7 +5,7 @@ var assert = require('assert');
 var myDB = 'test1';
 const client = new Influx.InfluxDB({
       // or single-host configuration
-      host : 'ec2-54-210-219-155.compute-1.amazonaws.com',
+      host : 'influx.foragelocal.com',
       port: 8086,
       database : myDB,
       schema: [{
@@ -32,7 +32,7 @@ var screenEeventSeries = "screeneventseries";
 
 const clientAnalytics = new Influx.InfluxDB({
       // or single-host configuration
-      host : 'ec2-54-210-219-155.compute-1.amazonaws.com',
+      host : 'influx.foragelocal.com',
       //host : 'localhost',
       port: 8086,
       database : analyticsDB,
